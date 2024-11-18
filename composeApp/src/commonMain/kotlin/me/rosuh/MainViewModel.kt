@@ -242,6 +242,7 @@ class MainViewModel : ViewModel() {
                         putAll(loadState.data?.subscriptionEntriesMap ?: emptyMap())
                         put(it, entriesState)
                     }
+                    FLog.d(TAG, "load home: $subscriptionType, append: $append, mapSize: ${newMap.size}")
                     loadState = LoadState.Success(SubscriptionWithEntries(newMap))
                     updateMainState {
                         updateSubscriptionState(subscriptionType, loadState)

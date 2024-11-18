@@ -1,6 +1,11 @@
 package me.rosuh
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -17,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,9 +41,7 @@ import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
@@ -49,6 +51,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabIndicatorScope
+import androidx.compose.material3.TabPosition
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -60,18 +64,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NamedNavArgument
@@ -87,12 +100,9 @@ import kfollow.composeapp.generated.resources.Res
 import kfollow.composeapp.generated.resources.logo
 import kotlinx.coroutines.launch
 import me.rosuh.data.api.SubscriptionType
-import me.rosuh.data.api.Subscriptions
 import me.rosuh.data.api.subscriptionType
 import me.rosuh.data.api.subscriptionTypeListTitle
 import me.rosuh.data.model.EntryData
-import me.rosuh.data.model.SubscriptionsResponse
-import me.rosuh.data.model.cover
 import me.rosuh.data.model.realTitle
 import me.rosuh.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
@@ -339,47 +349,38 @@ fun HomeScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            var state by remember { mutableStateOf(0) }
-            val titles = subscriptionTypeListTitle
             Column(modifier = Modifier.fillMaxSize()) {
+                var tabState by remember { mutableStateOf(0) }
+                val titles = subscriptionTypeListTitle
                 val coroutineScope = rememberCoroutineScope()
                 val pagerState = rememberPagerState(pageCount = {
                     subscriptionTypeListTitle.size
                 })
+                LaunchedEffect(pagerState) {
+                    snapshotFlow { pagerState.currentPage }.collect { page ->
+                        tabState = page
+                        // Do something with each page change, for example:
+                        // viewModel.sendPageSelectedEvent(page)
+                        FLog.d("Page change", "Page changed to $page")
+                    }
+                }
                 PrimaryScrollableTabRow(
-                    selectedTabIndex = state,
+                    selectedTabIndex = tabState,
                     edgePadding = 8.dp,
                     divider = {},
-                    indicator = @Composable {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = 8.dp, y = (-4).dp)
-                                .size(4.dp)
-                                .background(
-                                    color = Color(162, 201, 133),
-                                    shape = MaterialTheme.shapes.small
-                                )
-                                .shadow(
-                                    3.dp,
-                                    shape = MaterialTheme.shapes.small,
-                                    clip = false,
-                                    ambientColor = Color(162, 201, 133),
-                                    spotColor = Color(162, 201, 133)
-                                )
-                        )
-                    }
+                    indicator = { FancyAnimatedIndicatorWithModifier(tabState) }
                 ) {
                     titles.forEachIndexed { index, title ->
                         Tab(
-                            selected = state == index,
+                            selected = tabState == index,
                             onClick = {
-                                state = index
+                                tabState = index
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(index)
                                 }
                             },
                             text = {
-                                if (state == index) {
+                                if (tabState == index) {
                                     Text(
                                         text = title,
                                         maxLines = 2,
@@ -407,7 +408,7 @@ fun HomeScreen(
                         }
 
                         SubscriptionType.SocialMedia -> {
-                            SocialMediaScreen(mainViewModel, onPullToRefresh)
+                            SocialMediaScreen(mainViewModel)
                         }
 
                         SubscriptionType.Image -> {
@@ -432,6 +433,141 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TabIndicatorScope.FancyAnimatedIndicatorWithModifier(index: Int) {
+    val colors =
+        listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.secondary,
+            MaterialTheme.colorScheme.tertiary,
+        )
+    var startAnimatable by remember { mutableStateOf<Animatable<Dp, AnimationVector1D>?>(null) }
+    var endAnimatable by remember { mutableStateOf<Animatable<Dp, AnimationVector1D>?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val indicatorColor: Color by animateColorAsState(colors[index % colors.size], label = "")
+    val density = LocalDensity.current
+
+    // 添加一个动画值来控制水滴变形程度
+    val deformationAnimatable = remember { Animatable(0f) }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .tabIndicatorLayout { measurable, constraints, tabPositions ->
+                val tabWidth = (tabPositions[index].right - tabPositions[index].left)
+                val tabCenter = tabPositions[index].left + (tabWidth / 2)
+                val indicatorWidthPx = 4.dp
+                val newStartPx = tabCenter - (indicatorWidthPx / 2)
+                val newStart = newStartPx
+                val newEnd = newStartPx + indicatorWidthPx
+
+                val startAnim =
+                    startAnimatable
+                        ?: Animatable(newStart, Dp.VectorConverter).also { startAnimatable = it }
+
+                val endAnim =
+                    endAnimatable
+                        ?: Animatable(newEnd, Dp.VectorConverter).also { endAnimatable = it }
+
+                // 计算移动方向和距离
+                val isMovingRight = startAnim.targetValue > startAnim.value
+
+                // 启动变形动画
+                coroutineScope.launch {
+                    deformationAnimatable.animateTo(
+                        targetValue = if (isMovingRight) 1f else -1f,
+                        animationSpec = spring(
+                            dampingRatio = 0.7f,
+                            stiffness = 300f
+                        )
+                    )
+                    // 动画结束后恢复原形
+                    deformationAnimatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = 0.7f,
+                            stiffness = 300f
+                        )
+                    )
+                }
+
+                if (endAnim.targetValue != newEnd) {
+                    coroutineScope.launch {
+                        endAnim.animateTo(
+                            newEnd,
+                            animationSpec = spring(dampingRatio = 1f, stiffness = 500f)
+                        )
+                    }
+                }
+
+                if (startAnim.targetValue != newStart) {
+                    coroutineScope.launch {
+                        startAnim.animateTo(
+                            newStart,
+                            animationSpec = spring(dampingRatio = 1f, stiffness = 500f)
+                        )
+                    }
+                }
+
+                val indicatorEnd = endAnim.value.roundToPx()
+                val indicatorStart = startAnim.value.roundToPx()
+
+                val placeable =
+                    measurable.measure(
+                        constraints.copy(
+                            maxWidth = indicatorEnd - indicatorStart,
+                            minWidth = indicatorEnd - indicatorStart,
+                        )
+                    )
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeable.place(indicatorStart, constraints.maxHeight - 6.dp.roundToPx())
+                }
+            }
+            .drawBehind {
+                val deformation = deformationAnimatable.value
+
+                // 计算水滴变形
+                val baseRadius = 2.dp.toPx()
+                val leftRadius = baseRadius * (1f - deformation * 0.3f)
+                val rightRadius = baseRadius * (1f + deformation * 0.3f)
+
+                // Draw glow effect
+                for (i in 3 downTo 0) {
+                    val glowRadius = (4 + i).dp.toPx()
+                    val leftGlowRadius = glowRadius * (1f - deformation * 0.3f)
+                    val rightGlowRadius = glowRadius * (1f + deformation * 0.3f)
+
+                    // 绘制变形的发光效果
+                    drawOval(
+                        color = Color(162, 201, 133).copy(alpha = 0.1f - (i * 0.02f)),
+                        topLeft = Offset(
+                            center.x - leftGlowRadius,
+                            center.y - glowRadius
+                        ),
+                        size = Size(
+                            leftGlowRadius + rightGlowRadius,
+                            glowRadius * 2
+                        )
+                    )
+                }
+
+                // 绘制变形的主点
+                drawOval(
+                    color = Color(162, 201, 133),
+                    topLeft = Offset(
+                        center.x - leftRadius,
+                        center.y - baseRadius
+                    ),
+                    size = Size(
+                        leftRadius + rightRadius,
+                        baseRadius * 2
+                    )
+                )
+            }
+    )
+}
+
 @Composable
 fun NotificationScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType) -> Unit) {
     TODO("Not yet implemented")
@@ -453,7 +589,7 @@ fun ImageScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType
 }
 
 @Composable
-fun SocialMediaScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType) -> Unit) {
+fun SocialMediaScreen(mainViewModel: MainViewModel) {
     LaunchedEffect(Unit) {
         mainViewModel.processAction(MainViewModel.Action.LoadHome(SubscriptionType.SocialMedia))
     }
@@ -495,7 +631,7 @@ private fun SocialMediaItem(entryData: EntryData) {
                 // Avatar
                 AsyncImage(
                     model = ImageRequest.Builder(LocalPlatformContext.current)
-                        .data(entryData.entries.icon)
+                        .data(entryData.entries.icon.first)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Avatar",

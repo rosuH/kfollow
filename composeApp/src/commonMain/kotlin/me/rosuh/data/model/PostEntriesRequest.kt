@@ -64,14 +64,6 @@ data class Entry(
     }
 
     var icon: Pair<String, String> = Pair("", "")
-        get() {
-            FLog.d("Entry", "icon: $field")
-            if (media.isNullOrEmpty()) {
-                return field
-            }
-            val media = media[0]
-            return Pair(media.url, media.blurhash ?: "")
-        }
 }
 
 val Feed.cover: String
