@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,15 +30,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,6 +47,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -52,7 +55,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabIndicatorScope
-import androidx.compose.material3.TabPosition
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -73,18 +75,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NamedNavArgument
@@ -99,10 +95,12 @@ import com.dokar.sonner.rememberToasterState
 import kfollow.composeapp.generated.resources.Res
 import kfollow.composeapp.generated.resources.logo
 import kotlinx.coroutines.launch
+import me.rosuh.Icon.Play
 import me.rosuh.data.api.SubscriptionType
 import me.rosuh.data.api.subscriptionType
 import me.rosuh.data.api.subscriptionTypeListTitle
 import me.rosuh.data.model.EntryData
+import me.rosuh.data.model.cover
 import me.rosuh.data.model.realTitle
 import me.rosuh.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
@@ -202,7 +200,12 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
                         mainViewModel = mainViewModel,
                         navigationHeight = navigationHeight.value,
                         onPullToRefresh = { subscriptionType ->
-                            mainViewModel.processAction(MainViewModel.Action.LoadHome(subscriptionType, isRefresh = true))
+                            mainViewModel.processAction(
+                                MainViewModel.Action.LoadHome(
+                                    subscriptionType,
+                                    isRefresh = true
+                                )
+                            )
                         }
                     )
                 }
@@ -272,7 +275,7 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
                     .shadow(1.dp, shape = MaterialTheme.shapes.large)
                     .background(
                         MaterialTheme.colorScheme.surfaceContainer,
-                        shape = MaterialTheme.shapes.large
+                        shape = MaterialTheme.shapes.large.copy(bottomStart = CornerSize(0.dp), bottomEnd = CornerSize(0.dp))
                     )
                     .onGloballyPositioned { coordinates ->
                         navigationHeight.value =
@@ -340,9 +343,6 @@ fun HomeScreen(
     navigationHeight: Dp,
     onPullToRefresh: (SubscriptionType) -> Unit,
 ) {
-    LaunchedEffect(Unit) {
-        mainViewModel.processAction(MainViewModel.Action.LoadHome(subscriptionType = SubscriptionType.Article))
-    }
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -401,7 +401,7 @@ fun HomeScreen(
                         )
                     }
                 }
-                HorizontalPager(state = pagerState) { page ->
+                HorizontalPager(state = pagerState, beyondViewportPageCount = 2) { page ->
                     when (val type = page.subscriptionType) {
                         SubscriptionType.Article -> {
                             ArticleScreen(mainViewModel, navigationHeight)
@@ -412,11 +412,11 @@ fun HomeScreen(
                         }
 
                         SubscriptionType.Image -> {
-                            ImageScreen(mainViewModel, onPullToRefresh)
+                            ImageScreen(mainViewModel)
                         }
 
                         SubscriptionType.Video -> {
-                            VideoScreen(mainViewModel, onPullToRefresh)
+                            VideoScreen(mainViewModel)
                         }
 
                         SubscriptionType.Audio -> {
@@ -570,7 +570,7 @@ fun TabIndicatorScope.FancyAnimatedIndicatorWithModifier(index: Int) {
 
 @Composable
 fun NotificationScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType) -> Unit) {
-    TODO("Not yet implemented")
+
 }
 
 @Composable
@@ -579,13 +579,127 @@ fun AudioScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType
 }
 
 @Composable
-fun VideoScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType) -> Unit) {
-    TODO("Not yet implemented")
+fun VideoScreen(mainViewModel: MainViewModel) {
+    LaunchedEffect(Unit) {
+        mainViewModel.processAction(MainViewModel.Action.LoadHome(SubscriptionType.Video))
+    }
+    BaseHomeContentScreen(SubscriptionType.Video, mainViewModel) {
+        val videoState = mainViewModel.mainState.videoState
+        when {
+            videoState is LoadState.Error && videoState.data?.subscriptionEntriesMap.isNullOrEmpty() -> {
+                ErrorScreen(videoState) {
+                    mainViewModel.processAction(MainViewModel.Action.LoadHome(SubscriptionType.Video))
+                }
+            }
+
+            videoState is LoadState.Success -> {
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Adaptive(190.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalItemSpacing = 4.dp,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(videoState.data.allEntries) { item ->
+                        ImageFeedItem(item, true)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
-fun ImageScreen(mainViewModel: MainViewModel, onPullToRefresh: (SubscriptionType) -> Unit) {
-    TODO("Not yet implemented")
+fun ImageScreen(mainViewModel: MainViewModel) {
+    LaunchedEffect(Unit) {
+        mainViewModel.processAction(MainViewModel.Action.LoadHome(SubscriptionType.Image))
+    }
+    BaseHomeContentScreen(SubscriptionType.Image, mainViewModel) {
+        val imageState = mainViewModel.mainState.imageState
+        when {
+            imageState is LoadState.Error && imageState.data?.subscriptionEntriesMap.isNullOrEmpty() -> {
+                ErrorScreen(imageState) {
+                    mainViewModel.processAction(MainViewModel.Action.LoadHome(SubscriptionType.Image))
+                }
+            }
+
+            imageState is LoadState.Success -> {
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Adaptive(190.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalItemSpacing = 4.dp,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(imageState.data.allEntries) { item ->
+                        ImageFeedItem(item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageFeedItem(item: EntryData, isVideo: Boolean = false) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                // TODO: Handle click to open detail
+            },
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Box(Modifier.fillMaxWidth().height(250.dp)) {
+            AsyncImage(
+                model = item.entries.media?.firstOrNull()?.url
+                    ?: item.entries.attachments?.firstOrNull()?.url
+                    ?: item.feeds.cover,
+                contentDescription = item.entries.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            if (isVideo) {
+                Image(
+                    Play,
+                    contentDescription = "Play",
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .align(Alignment.TopEnd)
+                        .size(24.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                )
+            } else {
+                Text(
+                    text = item.entries.publishedDate,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(8.dp)
+        ) {
+            Text(
+                text = item.entries.realTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.feeds.title ?: "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -601,6 +715,7 @@ fun SocialMediaScreen(mainViewModel: MainViewModel) {
                     mainViewModel.processAction(MainViewModel.Action.LoadHome(SubscriptionType.SocialMedia))
                 }
             }
+
             socialState is LoadState.Success -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -616,7 +731,10 @@ fun SocialMediaScreen(mainViewModel: MainViewModel) {
 }
 
 @Composable
-private fun SocialMediaItem(entryData: EntryData) {
+private fun SocialMediaItem(
+    entryData: EntryData,
+    onClickReadMore: (EntryData) -> Unit = {}
+) {
     Card(
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth(),
         shape = MaterialTheme.shapes.medium
@@ -627,7 +745,6 @@ private fun SocialMediaItem(entryData: EntryData) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FLog.d("SocialMediaItem", "entryData: ${entryData.entries.icon}")
                 // Avatar
                 AsyncImage(
                     model = ImageRequest.Builder(LocalPlatformContext.current)
@@ -636,7 +753,7 @@ private fun SocialMediaItem(entryData: EntryData) {
                         .build(),
                     contentDescription = "Avatar",
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(35.dp)
                         .clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
@@ -671,8 +788,7 @@ private fun SocialMediaItem(entryData: EntryData) {
                 Spacer(modifier = Modifier.height(12.dp))
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
                 ) {
                     items(entryData.entries.media ?: emptyList()) { mediaItem ->
                         AsyncImage(
@@ -690,58 +806,19 @@ private fun SocialMediaItem(entryData: EntryData) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Interaction buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                SocialButton(
-                    icon = Icons.Default.ThumbUp,
-                    count = "800",
-                    onClick = { /* TODO */ }
-                )
-                SocialButton(
-                    icon = Icons.Default.Favorite,
-                    count = "102",
-                    onClick = { /* TODO */ }
-                )
-                SocialButton(
-                    icon = Icons.Default.Share,
-                    count = "200",
-                    onClick = { /* TODO */ }
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                OutlinedButton(
+                    onClick = {
+                        onClickReadMore(entryData)
+                    },
+                ) {
+                    Text(text = "阅读更多讨论")
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun SocialButton(
-    icon: ImageVector,
-    count: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = count,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -771,6 +848,9 @@ fun ArticleScreen(
     mainViewModel: MainViewModel,
     navigationHeight: Dp
 ) {
+    LaunchedEffect(Unit) {
+        mainViewModel.processAction(MainViewModel.Action.LoadHome(subscriptionType = SubscriptionType.Article))
+    }
     BaseHomeContentScreen(SubscriptionType.Article, mainViewModel) {
         val articleState = mainViewModel.mainState.articleState
         when {
@@ -805,7 +885,8 @@ fun ArticleScreen(
                                 entries is LoadState.Success
                                         || entries is LoadState.Loading && entries.isAppend
                                         || entries is LoadState.Loading && entries.isRefresh -> {
-                                            val data = (entries as? LoadState.Success)?.data ?: (entries as? LoadState.Loading)?.data
+                                    val data = (entries as? LoadState.Success)?.data
+                                        ?: (entries as? LoadState.Loading)?.data
                                     items(data?.data ?: emptyList()) { item ->
                                         Row(
                                             modifier = Modifier.clickable {
@@ -866,15 +947,20 @@ fun ArticleScreen(
                                     }
 
                                 }
+
                                 entries is LoadState.Loading -> {
                                     item {
-                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
                                             CircularProgressIndicator(
                                                 modifier = Modifier.padding(16.dp).size(24.dp),
                                             )
                                         }
                                     }
                                 }
+
                                 else -> {
                                     item {
                                         Text(

@@ -13,7 +13,7 @@ class EntriesApi {
         feedId: String,
         view: Int? = null,
         isArchived: Boolean = false,
-        read: Boolean = false,
+        read: Boolean? = null,
         publishedAfter: String? = null
     ): PostEntriesResponse {
         return postEntries(
@@ -29,7 +29,7 @@ class EntriesApi {
         listId: String,
         view: Int? = null,
         isArchived: Boolean = false,
-        read: Boolean = false,
+        read: Boolean? = null,
         publishedAfter: String? = null
     ): PostEntriesResponse {
         return postEntries(
@@ -46,7 +46,7 @@ class EntriesApi {
         listId: String? = null,
         view: Int? = null,
         isArchived: Boolean = false,
-        read: Boolean = false,
+        read: Boolean? = false,
         publishedAfter: String? = null
     ): PostEntriesResponse {
         val body = PostEntriesRequest(

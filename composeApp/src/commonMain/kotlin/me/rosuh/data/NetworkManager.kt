@@ -1,6 +1,7 @@
 package me.rosuh.data
 import io.ktor.client.*
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.plugins.defaultRequest
@@ -47,9 +48,14 @@ object NetworkManager {
                     FLog.v("NetworkManager", message)
                 }
             }
-            level = LogLevel.HEADERS
+            level = LogLevel.ALL
         }
         install(HttpCookies)
+        install(HttpTimeout) {
+            requestTimeoutMillis = 30000
+            connectTimeoutMillis = 30000
+            socketTimeoutMillis = 30000
+        }
         defaultRequest {
             url(BASE_URL)
         }

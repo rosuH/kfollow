@@ -29,7 +29,6 @@ import me.rosuh.data.model.EntryData
 import me.rosuh.data.model.PostEntriesResponse
 import me.rosuh.data.model.SubscriptionsResponse
 import me.rosuh.data.model.cover
-import me.rosuh.data.model.realTitle
 
 sealed class LoginState {
     data object Idle : LoginState()
@@ -70,8 +69,6 @@ data class SubscriptionWithEntries(
 class MainState(
     isInitialized: Boolean = false,
     loginState: LoginState = LoginState.Idle,
-    homeMessage: String = "",
-    homeData: PostEntriesResponse? = null,
     articleState: LoadState<SubscriptionWithEntries> = LoadState.Loading(),
     socialMediaState: LoadState<SubscriptionWithEntries> = LoadState.Loading(),
     imageState: LoadState<SubscriptionWithEntries> = LoadState.Loading(),
@@ -88,9 +85,6 @@ class MainState(
     var videoState by mutableStateOf(videoState)
     var audioState by mutableStateOf(audioState)
     var notificationState by mutableStateOf(notificationState)
-
-    val isArticleLoading: Boolean
-        get() = articleState is LoadState.Loading
 
     fun getViewState(subscriptionType: SubscriptionType): LoadState<SubscriptionWithEntries> {
         return when (subscriptionType) {
@@ -243,10 +237,6 @@ class MainViewModel : ViewModel() {
                         put(it, entriesState)
                     }
                     FLog.d(TAG, "load home: $subscriptionType, append: $append, mapSize: ${newMap.size}")
-                    loadState = LoadState.Success(SubscriptionWithEntries(newMap))
-                    updateMainState {
-                        updateSubscriptionState(subscriptionType, loadState)
-                    }
                     val result = when (subscriptionType) {
                         SubscriptionType.Article, SubscriptionType.Notification -> {
                             LoadState.Success(entriesApi.postListEntries(listId = it.feedId, view = it.view))
@@ -265,7 +255,7 @@ class MainViewModel : ViewModel() {
                         putAll(loadState.data?.subscriptionEntriesMap ?: emptyMap())
                         put(it, result)
                     }
-                    FLog.d(TAG, "load home success: $subscriptionType, append: $append, mapSize: ${newMap.size}")
+                    FLog.d(TAG, "load home success: $subscriptionType, append: $append, mapSize: ${newMap.size}, result.size=${result.data.data?.size}")
                     updateMainState {
                         updateSubscriptionState(
                             subscriptionType,
