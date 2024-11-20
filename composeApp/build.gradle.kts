@@ -63,6 +63,8 @@ kotlin {
                 implementation(libs.coil)
                 implementation(libs.coil.network.ktor3)
                 implementation(libs.coil.gif)
+                implementation(libs.haze)
+                implementation(libs.haze.materials)
             }
         }
         val desktopMain by getting

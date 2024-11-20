@@ -1,6 +1,7 @@
 package me.rosuh
 
 import androidx.collection.LruCache
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,8 @@ import me.rosuh.data.model.EntryData
 import me.rosuh.data.model.PostEntriesResponse
 import me.rosuh.data.model.SubscriptionsResponse
 import me.rosuh.data.model.cover
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 sealed class LoginState {
     data object Idle : LoginState()
@@ -55,6 +58,11 @@ data class SubscriptionWithEntries(
     val subscriptionEntriesMap: Map<SubscriptionsResponse.Subscription, LoadState<PostEntriesResponse>>,
     val message: String = ""
 ) {
+    @OptIn(ExperimentalUuidApi::class)
+    val uuid by lazy {
+        Uuid.random().toString()
+    }
+
     val allEntries: List<EntryData> = subscriptionEntriesMap.values.mapNotNull {
         (it as? LoadState.Success)?.data?.data ?: emptyList()
     }.flatten().sortedByDescending {
@@ -136,6 +144,20 @@ class MainState(
             }
         }
     }
+
+    private val subscriptionStateMap = mutableMapOf<SubscriptionType, Pair<String, LazyListState>>()
+
+    fun getOrPutLazyColumnState(
+        type: SubscriptionType,
+        uuid: String
+    ): LazyListState {
+        if (subscriptionStateMap.get(type)?.first == uuid) {
+            return subscriptionStateMap[type]?.second!!
+        }
+        val state = LazyListState()
+        subscriptionStateMap[type] = uuid to state
+        return state
+    }
 }
 
 class MainViewModel : ViewModel() {
@@ -196,6 +218,11 @@ class MainViewModel : ViewModel() {
         val subscriptionType = action.subscriptionType
         val append = action.append
         val retryCount = action.retryCount
+        if (action.isRefresh.not() && action.append.not() && mainState.getViewState(subscriptionType) is LoadState.Success) {
+            // direct return if not refresh and not append
+            FLog.d(TAG, "load home: $subscriptionType, append: $append, not refresh and not append")
+            return@withContext
+        }
         updateMainState {
             updateSubscriptionState(subscriptionType, LoadState.Loading(action.isRefresh, retryCount, false))
         }

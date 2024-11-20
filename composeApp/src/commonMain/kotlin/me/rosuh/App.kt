@@ -92,6 +92,12 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.dokar.sonner.rememberToasterState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 import kfollow.composeapp.generated.resources.Res
 import kfollow.composeapp.generated.resources.logo
 import kotlinx.coroutines.launch
@@ -153,6 +159,7 @@ sealed class Screen(
 }
 
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
     Surface(
@@ -169,6 +176,7 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
+            val hazeState = remember { HazeState() }
             var selectedItem by remember { mutableIntStateOf(0) }
             val items = listOf(
                 Screen.Home.title to Screen.Home.icon,
@@ -178,6 +186,7 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
             val transitionDuration = 350
             val navigationHeight = remember { mutableStateOf(0.dp) }
             NavHost(
+                modifier = Modifier.haze(hazeState),
                 navController = navController,
                 startDestination = Screen.Home.route
             ) {
@@ -274,14 +283,21 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
                     .fillMaxWidth()
                     .shadow(1.dp, shape = MaterialTheme.shapes.large)
                     .background(
-                        MaterialTheme.colorScheme.surfaceContainer,
-                        shape = MaterialTheme.shapes.large.copy(bottomStart = CornerSize(0.dp), bottomEnd = CornerSize(0.dp))
+                        Color.Transparent,
+                        shape = MaterialTheme.shapes.large.copy(
+                            bottomStart = CornerSize(0.dp),
+                            bottomEnd = CornerSize(0.dp)
+                        )
                     )
                     .onGloballyPositioned { coordinates ->
                         navigationHeight.value =
                             with(localDensity) { coordinates.size.height.toDp() }
                     }
                     .align(Alignment.BottomCenter)
+                    .hazeChild(
+                        hazeState,
+                        style = HazeMaterials.thin(MaterialTheme.colorScheme.background)
+                    )
             ) {
                 items.forEachIndexed { index, item ->
                     NavigationBarItem(
@@ -401,7 +417,7 @@ fun HomeScreen(
                         )
                     }
                 }
-                HorizontalPager(state = pagerState, beyondViewportPageCount = 2) { page ->
+                HorizontalPager(state = pagerState) { page ->
                     when (val type = page.subscriptionType) {
                         SubscriptionType.Article -> {
                             ArticleScreen(mainViewModel, navigationHeight)
@@ -718,11 +734,20 @@ fun SocialMediaScreen(mainViewModel: MainViewModel) {
 
             socialState is LoadState.Success -> {
                 LazyColumn(
+                    state = mainViewModel.mainState.getOrPutLazyColumnState(
+                        SubscriptionType.SocialMedia,
+                        mainViewModel.mainState.socialMediaState.data!!.uuid
+                    ),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(socialState.data.allEntries) { item ->
-                        SocialMediaItem(item)
+                    items(socialState.data.allEntries, key = {
+                        it.entries.id
+                    }, contentType = {
+                        SubscriptionType.Image
+                    }
+                    ) { item ->
+                        SocialMediaItem(modifier = Modifier.animateItem(), item)
                     }
                 }
             }
@@ -732,12 +757,13 @@ fun SocialMediaScreen(mainViewModel: MainViewModel) {
 
 @Composable
 private fun SocialMediaItem(
+    modifier: Modifier = Modifier,
     entryData: EntryData,
     onClickReadMore: (EntryData) -> Unit = {}
 ) {
     Card(
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium
+        modifier = modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+        shape = MaterialTheme.shapes.small
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             // Header with avatar and user info
@@ -811,6 +837,7 @@ private fun SocialMediaItem(
             // Interaction buttons
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 OutlinedButton(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     onClick = {
                         onClickReadMore(entryData)
                     },
@@ -842,13 +869,13 @@ fun BaseHomeContentScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalHazeMaterialsApi::class)
 @Composable
 fun ArticleScreen(
     mainViewModel: MainViewModel,
     navigationHeight: Dp
 ) {
-    LaunchedEffect(Unit) {
+    LaunchedEffect(mainViewModel.mainState.articleState) {
         mainViewModel.processAction(MainViewModel.Action.LoadHome(subscriptionType = SubscriptionType.Article))
     }
     BaseHomeContentScreen(SubscriptionType.Article, mainViewModel) {
@@ -866,18 +893,22 @@ fun ArticleScreen(
 
             articleState is LoadState.Success -> {
                 Column {
+                    val hazeState = remember { HazeState() }
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         articleState.data.subscriptionEntriesMap.entries.forEach { feedWithList ->
                             val (subscription, entries) = feedWithList
                             stickyHeader(subscription.title) {
                                 Box(
                                     modifier = Modifier.fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceContainer)
                                         .padding(16.dp)
+                                        .hazeChild(
+                                            hazeState,
+                                            style = HazeMaterials.ultraThin(MaterialTheme.colorScheme.surfaceContainer)
+                                        )
                                 ) {
                                     Text(
                                         text = subscription.realTitle,
-                                        style = MaterialTheme.typography.titleMedium
+                                        style = MaterialTheme.typography.titleLarge
                                     )
                                 }
                             }
@@ -894,7 +925,8 @@ fun ArticleScreen(
                                             }.padding(
                                                 horizontal = 16.dp,
                                                 vertical = 8.dp
-                                            ).defaultMinSize(minHeight = 68.dp).animateItem(),
+                                            ).defaultMinSize(minHeight = 68.dp).animateItem()
+                                                .haze(hazeState),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             AsyncImage(

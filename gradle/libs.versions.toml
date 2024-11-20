@@ -72,7 +72,10 @@ coil = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
 
-
+# dev.chrisbanes.haze:haze
+haze = { module = "dev.chrisbanes.haze:haze", version = "1.0.2" }
+# dev.chrisbanes.haze:haze-materials
+haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version = "1.0.2" }
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
