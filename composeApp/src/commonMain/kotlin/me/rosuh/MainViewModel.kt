@@ -189,7 +189,11 @@ class MainViewModel : ViewModel() {
         ) : Action()
     }
 
-    val mainState = MainState()
+    val mainState = MainState(loginState = if (getSessionData()?.isExpired() == false) {
+        LoginState.Success(false, getSessionToken()!!)
+    } else {
+        LoginState.Idle
+    })
 
     fun processAction(action: Action) {
         when (action) {

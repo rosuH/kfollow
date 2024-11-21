@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -44,6 +45,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
@@ -56,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabIndicatorScope
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -74,6 +77,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -738,8 +742,7 @@ fun SocialMediaScreen(mainViewModel: MainViewModel) {
                         SubscriptionType.SocialMedia,
                         mainViewModel.mainState.socialMediaState.data!!.uuid
                     ),
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(socialState.data.allEntries, key = {
                         it.entries.id
@@ -747,7 +750,10 @@ fun SocialMediaScreen(mainViewModel: MainViewModel) {
                         SubscriptionType.Image
                     }
                     ) { item ->
-                        SocialMediaItem(modifier = Modifier.animateItem(), item)
+                        Column(modifier = Modifier.clickable {  }) {
+                            SocialMediaItem(modifier = Modifier.animateItem(), item)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), thickness = 0.5.dp)
+                        }
                     }
                 }
             }
@@ -761,88 +767,75 @@ private fun SocialMediaItem(
     entryData: EntryData,
     onClickReadMore: (EntryData) -> Unit = {}
 ) {
-    Card(
-        modifier = modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-        shape = MaterialTheme.shapes.small
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            // Header with avatar and user info
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Avatar
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalPlatformContext.current)
-                        .data(entryData.entries.icon.first)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Avatar",
-                    modifier = Modifier
-                        .size(35.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
+    Column(modifier = modifier.fillMaxWidth().padding(16.dp)) {
+        // Header with avatar and user info
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Avatar
+            AsyncImage(
+                model = ImageRequest.Builder(LocalPlatformContext.current)
+                    .data(entryData.entries.icon.first)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Avatar",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.FillBounds
+            )
 
-                Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-                // Username and time
-                Column {
+            Column(modifier = Modifier.offset(y = (-4).dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    // Username and time
                     Text(
                         text = entryData.feeds.title ?: "",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = " · ",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Light,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = entryData.entries.publishedDate,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Light,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     )
                 }
+                Spacer(modifier = Modifier.height(2.dp))
+                // Content
+                Text(
+                    text = entryData.entries.realTitle,
+                    style = MaterialTheme.typography.bodyLarge
+                )
             }
+        }
 
+        // Image if available
+        if (entryData.entries.media.isNullOrEmpty().not()) {
             Spacer(modifier = Modifier.height(12.dp))
-
-            // Content
-            Text(
-                text = entryData.entries.realTitle,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            // Image if available
-            if (entryData.entries.media.isNullOrEmpty().not()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
-                ) {
-                    items(entryData.entries.media ?: emptyList()) { mediaItem ->
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalPlatformContext.current)
-                                .data(mediaItem.url)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(MaterialTheme.shapes.medium),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Interaction buttons
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                OutlinedButton(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    onClick = {
-                        onClickReadMore(entryData)
-                    },
-                ) {
-                    Text(text = "阅读更多讨论")
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
+            ) {
+                items(entryData.entries.media ?: emptyList()) { mediaItem ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalPlatformContext.current)
+                            .data(mediaItem.url)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(MaterialTheme.shapes.medium),
+                        contentScale = ContentScale.Crop
+                    )
                 }
             }
         }
@@ -893,23 +886,36 @@ fun ArticleScreen(
 
             articleState is LoadState.Success -> {
                 Column {
-                    val hazeState = remember { HazeState() }
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         articleState.data.subscriptionEntriesMap.entries.forEach { feedWithList ->
                             val (subscription, entries) = feedWithList
                             stickyHeader(subscription.title) {
-                                Box(
+                                Row(
                                     modifier = Modifier.fillMaxWidth()
-                                        .padding(16.dp)
-                                        .hazeChild(
-                                            hazeState,
-                                            style = HazeMaterials.ultraThin(MaterialTheme.colorScheme.surfaceContainer)
+                                        .background(
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(
+                                                    MaterialTheme.colorScheme.surface,
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+                                                )
+                                            )
                                         )
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
                                         text = subscription.realTitle,
                                         style = MaterialTheme.typography.titleLarge
                                     )
+                                    TextButton(
+                                        onClick = {
+                                            // todo jump to subscription detail page
+                                        }
+                                    ) {
+                                        Text(text = "更多 >", style = MaterialTheme.typography.labelMedium)
+                                    }
                                 }
                             }
                             when {
@@ -925,8 +931,7 @@ fun ArticleScreen(
                                             }.padding(
                                                 horizontal = 16.dp,
                                                 vertical = 8.dp
-                                            ).defaultMinSize(minHeight = 68.dp).animateItem()
-                                                .haze(hazeState),
+                                            ).defaultMinSize(minHeight = 68.dp).animateItem(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             AsyncImage(
@@ -956,12 +961,13 @@ fun ArticleScreen(
                                                         fontSize = 12.sp,
                                                         maxLines = 1,
                                                         style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                     Spacer(modifier = Modifier.width(2.dp))
                                                     Text(
                                                         text = "·",
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
@@ -970,6 +976,7 @@ fun ArticleScreen(
                                                     Text(
                                                         text = item.feeds.title ?: "",
                                                         style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
