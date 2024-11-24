@@ -189,11 +189,17 @@ class MainViewModel : ViewModel() {
         ) : Action()
     }
 
-    val mainState = MainState(loginState = if (getSessionData()?.isExpired() == false) {
-        LoginState.Success(false, getSessionToken()!!)
-    } else {
-        LoginState.Idle
-    })
+    val mainState = MainState(loginState = getAndSetSessionToken()?.let {
+        LoginState.Success(false, it)
+    } ?: LoginState.Idle)
+
+    private fun getAndSetSessionToken(): String? {
+        return getSessionToken()?.takeIf {
+            getSessionData()?.isExpired() == false && it.isNotBlank()
+        }?.also {
+            NetworkManager.setSessionToken(it)
+        }
+    }
 
     fun processAction(action: Action) {
         when (action) {
@@ -324,8 +330,7 @@ class MainViewModel : ViewModel() {
 
     private suspend fun initialize() = withContext(Dispatchers.IO) {
         FLog.i(TAG, "initialize")
-        if (getSessionData()?.isExpired() == false) {
-            NetworkManager.setSessionToken(getSessionToken()!!)
+        if (getAndSetSessionToken() != null) {
             loadSubscriptionDeffer = async {
                 loadSubscription()
             }
@@ -340,9 +345,8 @@ class MainViewModel : ViewModel() {
     }
 
     private suspend fun login(provider: String) = withContext(Dispatchers.IO) {
-        if (getSessionData()?.isExpired() == false) {
+        if (getAndSetSessionToken() != null) {
             // 通知 UI 登录成功
-            NetworkManager.setSessionToken(getSessionToken()!!)
             updateMainState {
                 loginState = LoginState.Success(false, getSessionToken()!!)
             }

@@ -1,6 +1,7 @@
 package me.rosuh.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
@@ -247,6 +248,10 @@ data class ColorFamily(
 val unspecified_scheme = ColorFamily(
     Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
 )
+
+val ColorScheme.brandBg: Color
+    @Composable
+    get() = if (isSystemInDarkTheme()) brandBgDark else brandBgLight
 
 @Composable
 fun AppTheme(
