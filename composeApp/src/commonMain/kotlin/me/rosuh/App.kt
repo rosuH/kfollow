@@ -173,10 +173,7 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
     var subscriptionEnterTransition = remember {
         AnimatedContentTransitionScope.SlideDirection.Left
     }
-    Box(
-        Modifier.fillMaxSize()
-            .navigationBarsPadding()
-    ) {
+    Box(Modifier.fillMaxSize()) {
         val hazeState = remember { HazeState() }
         var selectedItem by remember { mutableIntStateOf(0) }
         val items = listOf(
@@ -281,7 +278,7 @@ fun MainScreen(mainViewModel: MainViewModel = koinInject()) {
         val localDensity = LocalDensity.current
         Row(
             Modifier
-                .fillMaxWidth()
+                .fillMaxWidth().navigationBarsPadding()
                 .shadow(1.dp, shape = MaterialTheme.shapes.large)
                 .background(
                     Color.Transparent,
