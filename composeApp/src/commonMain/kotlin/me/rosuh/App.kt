@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -124,18 +126,20 @@ import org.koin.compose.koinInject
 @Preview
 fun App(mainViewModel: MainViewModel = koinInject()) {
     AppTheme {
-        FLog.d("App", "mainViewModel: $mainViewModel")
-        LaunchedEffect(Unit) {
-            mainViewModel.processAction(MainViewModel.Action.Initialize)
-        }
-        // when login state is success, animating navigate to the main screen
-        when (val loginState = mainViewModel.mainState.loginState) {
-            is LoginState.Success -> MainScreen()
-            else -> SplashScreen(loginState, goLogin = {
-                mainViewModel.processAction(MainViewModel.Action.Login(it))
-            }, resetToast = {
-                mainViewModel.mainState.updateLoginState(LoginState.Idle)
-            })
+        Surface {
+            FLog.d("App", "mainViewModel: $mainViewModel")
+            LaunchedEffect(Unit) {
+                mainViewModel.processAction(MainViewModel.Action.Initialize)
+            }
+            // when login state is success, animating navigate to the main screen
+            when (val loginState = mainViewModel.mainState.loginState) {
+                is LoginState.Success -> MainScreen()
+                else -> SplashScreen(loginState, goLogin = {
+                    mainViewModel.processAction(MainViewModel.Action.Login(it))
+                }, resetToast = {
+                    mainViewModel.mainState.updateLoginState(LoginState.Idle)
+                })
+            }
         }
     }
 }
@@ -370,7 +374,8 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             PrimaryScrollableTabRow(
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface).statusBarsPadding(),
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                    .statusBarsPadding(),
                 containerColor = MaterialTheme.colorScheme.surface,
                 selectedTabIndex = tabState,
                 edgePadding = 0.dp,
@@ -420,7 +425,7 @@ fun HomeScreen(
         }
     ) { contentPadding ->
         HorizontalPager(state = pagerState, contentPadding = contentPadding) { page ->
-            val pageModifier = Modifier.background(MaterialTheme.colorScheme.background).fillMaxSize().padding(bottom = navigationHeight)
+            val pageModifier = Modifier.fillMaxSize().padding(bottom = navigationHeight)
             when (page.subscriptionType) {
                 SubscriptionType.Article -> {
                     ArticleScreen(
@@ -829,28 +834,72 @@ private fun SocialMediaItem(
                     text = entryData.entries.realTitle,
                     style = MaterialTheme.typography.bodyLarge
                 )
-            }
-        }
 
-        // Image if available
-        if (entryData.entries.media.isNullOrEmpty().not()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
-            ) {
-                items(entryData.entries.media ?: emptyList()) { mediaItem ->
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalPlatformContext.current)
-                            .data(mediaItem.url)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(MaterialTheme.shapes.medium),
-                        contentScale = ContentScale.Crop
-                    )
+                if (entryData.entries.media?.isNotEmpty() == true) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                            shape = MaterialTheme.shapes.medium
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
+                    ) {
+                        when (entryData.entries.media.size) {
+                            1 -> {
+                                // Single image, fill the width and aspect ratio 16:9
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalPlatformContext.current)
+                                        .data(entryData.entries.media.first().url)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(16 / 9f)
+                                        .clip(MaterialTheme.shapes.medium),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+
+                            2 -> {
+                                // Two images, fill the width and aspect ratio 16:9
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    entryData.entries.media.take(2).forEach { mediaItem ->
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalPlatformContext.current)
+                                                .data(mediaItem.url)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(16 / 9f)
+                                                .clip(MaterialTheme.shapes.medium),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                }
+                            }
+                            else -> {
+                                LazyRow(modifier = Modifier.fillMaxWidth()) {
+                                    items(entryData.entries.media) { mediaItem ->
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalPlatformContext.current)
+                                                .data(mediaItem.url)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(120.dp)
+                                                .clip(MaterialTheme.shapes.medium),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -920,9 +969,8 @@ fun ArticleScreen(
                                     .background(
                                         brush = Brush.verticalGradient(
                                             colors = listOf(
-                                                MaterialTheme.colorScheme.surface,
-                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                                                MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
+                                                MaterialTheme.colorScheme.background,
+                                                MaterialTheme.colorScheme.background,
                                                 MaterialTheme.colorScheme.background.copy(alpha = 0f),
                                             )
                                         )
@@ -933,7 +981,8 @@ fun ArticleScreen(
                             ) {
                                 Text(
                                     text = subscription.realTitle,
-                                    style = MaterialTheme.typography.titleMedium
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                                 TextButton(
                                     onClick = {
