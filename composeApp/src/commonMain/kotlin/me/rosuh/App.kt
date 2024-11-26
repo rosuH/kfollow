@@ -12,6 +12,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +35,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -66,7 +71,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -89,7 +93,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NamedNavArgument
@@ -108,7 +111,10 @@ import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import kfollow.composeapp.generated.resources.Res
 import kfollow.composeapp.generated.resources.logo
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.rosuh.Icon.Play
 import me.rosuh.data.api.SubscriptionType
 import me.rosuh.data.api.subscriptionType
@@ -121,6 +127,8 @@ import me.rosuh.ui.theme.brandColor
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 @Composable
 @Preview
@@ -837,53 +845,49 @@ private fun SocialMediaItem(
 
                 if (entryData.entries.media?.isNotEmpty() == true) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                            shape = MaterialTheme.shapes.medium
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
-                    ) {
-                        when (entryData.entries.media.size) {
-                            1 -> {
-                                // Single image, fill the width and aspect ratio 16:9
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalPlatformContext.current)
-                                        .data(entryData.entries.media.first().url)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(16 / 9f)
-                                        .clip(MaterialTheme.shapes.medium),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
+                    when (entryData.entries.media.size) {
+                        1 -> {
+                            // Single image, fill the width and aspect ratio 16:9
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalPlatformContext.current)
+                                    .data(entryData.entries.media.first().url)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxWidth().aspectRatio(16 / 9f).border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                    shape = MaterialTheme.shapes.medium
+                                ).clip(MaterialTheme.shapes.medium),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
 
-                            2 -> {
-                                // Two images, fill the width and aspect ratio 16:9
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    entryData.entries.media.take(2).forEach { mediaItem ->
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(LocalPlatformContext.current)
-                                                .data(mediaItem.url)
-                                                .crossfade(true)
-                                                .build(),
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .aspectRatio(16 / 9f)
-                                                .clip(MaterialTheme.shapes.medium),
-                                            contentScale = ContentScale.Crop
-                                        )
+                        else -> {
+                            // Two images, fill the width and aspect ratio 16:9
+                            val imageHeight = remember { mutableStateOf(0.dp) }
+                            val density = LocalDensity.current
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .aspectRatio(16 / 9f)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                        shape = MaterialTheme.shapes.medium
+                                    ).clip(MaterialTheme.shapes.medium).onGloballyPositioned {
+                                        imageHeight.value = if (entryData.entries.media.size <= 2) {
+                                            with(density) { it.size.height.toDp() }
+                                        } else {
+                                            with(density) { it.size.height.toDp() / 2 }
+                                        }
                                     }
-                                }
-                            }
-                            else -> {
-                                LazyRow(modifier = Modifier.fillMaxWidth()) {
-                                    items(entryData.entries.media) { mediaItem ->
+                            ) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(2),
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(entryData.entries.media.take(4)) { mediaItem ->
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalPlatformContext.current)
                                                 .data(mediaItem.url)
@@ -891,8 +895,8 @@ private fun SocialMediaItem(
                                                 .build(),
                                             contentDescription = null,
                                             modifier = Modifier
-                                                .size(120.dp)
-                                                .clip(MaterialTheme.shapes.medium),
+                                                .fillMaxWidth()
+                                                .height(imageHeight.value),
                                             contentScale = ContentScale.Crop
                                         )
                                     }
@@ -914,7 +918,7 @@ fun BaseHomeContentScreen(
     mainViewModel: MainViewModel,
     content: @Composable () -> Unit
 ) {
-    LaunchedEffect(mainViewModel.mainState.getViewState(type)) {
+    LaunchedEffect(Unit) {
         mainViewModel.processAction(MainViewModel.Action.LoadHome(subscriptionType = type))
     }
     val pullToRefreshState = rememberPullToRefreshState()

@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -42,6 +43,10 @@ sealed class LoginState {
 }
 
 sealed class LoadState<R> {
+    @OptIn(ExperimentalUuidApi::class)
+    val uuid by lazy {
+        Uuid.random().toString()
+    }
     abstract val data: R?
     data class Loading<R>(
         val isRefresh: Boolean = false,
@@ -55,7 +60,7 @@ sealed class LoadState<R> {
 }
 
 data class SubscriptionWithEntries(
-    val subscriptionEntriesMap: Map<SubscriptionsResponse.Subscription, LoadState<PostEntriesResponse>>,
+    var subscriptionEntriesMap: MutableMap<SubscriptionsResponse.Subscription, LoadState<PostEntriesResponse>> = ConcurrentMap(3),
     val message: String = ""
 ) {
     @OptIn(ExperimentalUuidApi::class)
@@ -264,16 +269,11 @@ class MainViewModel : ViewModel() {
         homeReqMap[subscriptionType]?.forEach { it.cancel() }
         homeReqMap[subscriptionType] = emptyList()
         // 并发获取每个列表的数据
-        subscription.map {
+        subscription.mapIndexed { index, it ->
             async {
                 try {
                     val entriesState = LoadState.Loading<PostEntriesResponse>(isRefresh = action.isRefresh)
-                    var loadState = mainState.getViewState(subscriptionType)
-                    var newMap = ConcurrentMap<SubscriptionsResponse.Subscription, LoadState<PostEntriesResponse>>().apply {
-                        putAll(loadState.data?.subscriptionEntriesMap ?: emptyMap())
-                        put(it, entriesState)
-                    }
-                    FLog.d(TAG, "load home: $subscriptionType, append: $append, mapSize: ${newMap.size}")
+                    FLog.d(TAG, "load home: $subscriptionType, append: $append, mapSize: ${mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap?.size}")
                     val result = when (subscriptionType) {
                         SubscriptionType.Article, SubscriptionType.Notification -> {
                             LoadState.Success(entriesApi.postListEntries(listId = it.feedId, view = it.view))
@@ -287,13 +287,11 @@ class MainViewModel : ViewModel() {
                         val icon = getUrlIcon(it.entries.url ?: "")
                         it.entries.icon = icon
                     }
-                    loadState = mainState.getViewState(subscriptionType)
-                    newMap = ConcurrentMap<SubscriptionsResponse.Subscription, LoadState<PostEntriesResponse>>().apply {
-                        putAll(loadState.data?.subscriptionEntriesMap ?: emptyMap())
-                        put(it, result)
-                    }
-                    FLog.d(TAG, "load home success: $subscriptionType, append: $append, mapSize: ${newMap.size}, result.size=${result.data.data?.size}")
                     updateMainState {
+                        val newMap = ConcurrentMap<SubscriptionsResponse.Subscription, LoadState<PostEntriesResponse>>().apply {
+                            putAll(mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap ?: emptyMap())
+                            put(it, result)
+                        }
                         updateSubscriptionState(
                             subscriptionType,
                             LoadState.Success(
@@ -301,6 +299,7 @@ class MainViewModel : ViewModel() {
                                 append
                             )
                         )
+                        FLog.d(TAG, "load home success: $subscriptionType, append: $append, mapSize: ${mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap?.size}, result.size=${result.data.data?.size}")
                     }
                 } catch (e: Exception) {
                     FLog.e(TAG, "load home error: ${e.message}")

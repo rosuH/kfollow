@@ -48,7 +48,7 @@ object NetworkManager {
                     FLog.v("NetworkManager", message)
                 }
             }
-            level = LogLevel.ALL
+            level = LogLevel.HEADERS
         }
         install(HttpCookies)
         install(HttpTimeout) {
