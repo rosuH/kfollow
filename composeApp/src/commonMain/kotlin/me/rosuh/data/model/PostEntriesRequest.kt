@@ -14,7 +14,7 @@ data class EntryResponse(
 @Serializable
 data class PostEntriesResponse(
     val code: Int,
-    val remaining: Int,
+    val remaining: Int? = null,
     val data: List<EntryData>? = null,
     val total: Int? = null
 )
