@@ -1019,7 +1019,11 @@ fun ArticleScreen(
                                     Row(
                                         modifier = Modifier
                                             .clickable {
-                                                // todo jump to detail page
+                                                mainViewModel.processAction(
+                                                    MainViewModel.Action.OpenUrl(
+                                                        item.entries.url ?: item.entries.guid
+                                                    )
+                                                )
                                             }.padding(
                                                 horizontal = 16.dp,
                                                 vertical = 8.dp

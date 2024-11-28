@@ -15,6 +15,8 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSURLComponents
 import platform.Foundation.NSURLQueryItem
 import platform.Foundation.NSUserDefaults
+import platform.SafariServices.SFSafariViewController
+import platform.SafariServices.SFSafariViewControllerDelegateProtocol
 import platform.UIKit.UIApplication
 import platform.UIKit.UIScreen
 import platform.UIKit.UIUserInterfaceStyle
@@ -67,6 +69,7 @@ actual fun startOAuth(provider: String, callback: OAuthCallback) {
                     else -> callback.onError(OAuthError.Unknown, error.localizedDescription)
                 }
             }
+
             callbackURL != null -> {
                 val components = NSURLComponents(uRL = callbackURL, resolvingAgainstBaseURL = false)
                 val queryItems = components.queryItems as? List<NSURLQueryItem>
@@ -80,31 +83,58 @@ actual fun startOAuth(provider: String, callback: OAuthCallback) {
                     callback.onError(OAuthError.NoToken, "No token received")
                 }
             }
+
             else -> callback.onCancel()
         }
     }
 
-    val contextProvider = object : NSObject(), ASWebAuthenticationPresentationContextProvidingProtocol {
-        override fun presentationAnchorForWebAuthenticationSession(
-            session: ASWebAuthenticationSession
-        ): UIWindow {
-            return UIApplication.sharedApplication.keyWindow!!
-        }
+    val contextProvider =
+        object : NSObject(), ASWebAuthenticationPresentationContextProvidingProtocol {
+            override fun presentationAnchorForWebAuthenticationSession(
+                session: ASWebAuthenticationSession
+            ): UIWindow {
+                return UIApplication.sharedApplication.keyWindow!!
+            }
 
-        override fun description(): String {
-            return "ASWebAuthenticationPresentationContextProvider"
-        }
+            override fun description(): String {
+                return "ASWebAuthenticationPresentationContextProvider"
+            }
 
-        override fun hash(): ULong {
-            return hashCode().toULong()
-        }
+            override fun hash(): ULong {
+                return hashCode().toULong()
+            }
 
-        override fun isEqual(other: Any?): Boolean {
-            return this === other
+            override fun isEqual(other: Any?): Boolean {
+                return this === other
+            }
         }
-    }
 
     webAuthSession?.presentationContextProvider = contextProvider
     webAuthSession?.prefersEphemeralWebBrowserSession = true
     webAuthSession?.start()
+}
+
+actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
+    val webAuthSession = ASWebAuthenticationSession(
+        uRL = NSURL.URLWithString(url)!!,
+        callbackURLScheme = null
+    ) { callbackURL, error ->
+        if (error != null) {
+            callback(WebPageState.Finished(url, error.code.toString(), error.localizedDescription))
+        } else if (callbackURL != null) {
+            callback(WebPageState.Finished(url, "0", "User closed the page"))
+        } else {
+            callback(WebPageState.Finished(url, "-9999", "Unknown error"))
+        }
+    }
+
+    val contextProvider = object : NSObject(), ASWebAuthenticationPresentationContextProvidingProtocol {
+        override fun presentationAnchorForWebAuthenticationSession(session: ASWebAuthenticationSession): UIWindow {
+            return UIApplication.sharedApplication.keyWindow!!
+        }
+    }
+
+    webAuthSession.presentationContextProvider = contextProvider
+    webAuthSession.prefersEphemeralWebBrowserSession = true
+    webAuthSession.start()
 }

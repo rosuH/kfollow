@@ -100,6 +100,7 @@ kotlin {
                 implementation(libs.androidx.browser)
                 implementation(libs.koin.core)
                 implementation(libs.koin.android)
+                implementation(libs.androidx.browser)
             }
         }
         desktopMain.dependencies {

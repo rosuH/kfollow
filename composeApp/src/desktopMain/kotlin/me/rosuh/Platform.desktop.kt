@@ -81,3 +81,8 @@ actual fun startOAuth(provider: String, callback: OAuthCallback) {
         }
     }
 }
+
+actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
+    // open url in default browser
+    Desktop.getDesktop().browse(URI(url))
+}

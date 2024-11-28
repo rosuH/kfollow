@@ -192,6 +192,8 @@ class MainViewModel : ViewModel() {
             val retryCount: Int = 0,
             val isRefresh: Boolean = false
         ) : Action()
+
+        data class OpenUrl(val url: String) : Action()
     }
 
     val mainState = MainState(loginState = getAndSetSessionToken()?.let {
@@ -223,6 +225,14 @@ class MainViewModel : ViewModel() {
             is Action.LoadHome -> {
                 scope.launch {
                     loadHome(action)
+                }
+            }
+
+            is Action.OpenUrl -> {
+                scope.launch {
+                    openWebPage(action.url) { webPageState ->
+                        FLog.i(TAG, "web page state: $webPageState")
+                    }
                 }
             }
         }

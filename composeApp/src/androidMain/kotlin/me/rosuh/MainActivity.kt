@@ -7,11 +7,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val TAG = "MainActivity"
+        var mainActivity: MainActivity? = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        mainActivity = this
         setContent {
             App()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mainActivity = null
     }
 }
 
