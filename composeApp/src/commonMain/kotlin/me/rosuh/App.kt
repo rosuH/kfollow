@@ -87,6 +87,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -115,6 +116,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.rosuh.Icon.ImgPlaceholder
 import me.rosuh.Icon.Play
 import me.rosuh.data.api.SubscriptionType
 import me.rosuh.data.api.subscriptionType
@@ -859,6 +861,8 @@ private fun SocialMediaItem(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
                                     shape = MaterialTheme.shapes.medium
                                 ).clip(MaterialTheme.shapes.medium),
+                                placeholder = rememberVectorPainter(ImgPlaceholder),
+                                error = rememberVectorPainter(ImgPlaceholder),
                                 contentScale = ContentScale.Crop
                             )
                         }
@@ -893,6 +897,8 @@ private fun SocialMediaItem(
                                                 .data(mediaItem.url)
                                                 .crossfade(true)
                                                 .build(),
+                                            placeholder = rememberVectorPainter(ImgPlaceholder),
+                                            error = rememberVectorPainter(ImgPlaceholder),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .fillMaxWidth()
