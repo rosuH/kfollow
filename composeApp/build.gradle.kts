@@ -74,10 +74,6 @@ kotlin {
 
         // Create and configure iosMain source set
         val iosMain by getting {
-            iosX64Main.dependsOn(this)
-            iosArm64Main.dependsOn(this)
-            iosSimulatorArm64Main.dependsOn(this)
-            dependsOn(commonMain)
             dependencies {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
