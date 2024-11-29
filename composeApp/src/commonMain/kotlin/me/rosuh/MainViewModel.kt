@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -156,7 +155,7 @@ class MainState(
         type: SubscriptionType,
         uuid: String
     ): LazyListState {
-        if (subscriptionStateMap.get(type)?.first == uuid) {
+        if (subscriptionStateMap[type]?.first == uuid) {
             return subscriptionStateMap[type]?.second!!
         }
         val state = LazyListState()
@@ -193,7 +192,7 @@ class MainViewModel : ViewModel() {
             val isRefresh: Boolean = false
         ) : Action()
 
-        data class OpenUrl(val url: String) : Action()
+        data class GoDetail(val entryData: EntryData) : Action()
     }
 
     val mainState = MainState(loginState = getAndSetSessionToken()?.let {
@@ -228,9 +227,9 @@ class MainViewModel : ViewModel() {
                 }
             }
 
-            is Action.OpenUrl -> {
+            is Action.GoDetail -> {
                 scope.launch {
-                    openWebPage(action.url) { webPageState ->
+                    openWebPage(action.entryData.entries.url ?: action.entryData.entries.guid) { webPageState ->
                         FLog.i(TAG, "web page state: $webPageState")
                     }
                 }
