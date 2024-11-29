@@ -1,8 +1,10 @@
 package me.rosuh
 
-import kotlinx.cinterop.COpaquePointer
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.ObjCClass
+import platform.WebKit.*
+import platform.UIKit.*
+import platform.Foundation.*
+import platform.CoreGraphics.*
+import kotlinx.cinterop.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import me.rosuh.data.OAuthCallback
@@ -10,19 +12,8 @@ import me.rosuh.data.OAuthError
 import me.rosuh.data.SessionResponse
 import platform.AuthenticationServices.ASWebAuthenticationPresentationContextProvidingProtocol
 import platform.AuthenticationServices.ASWebAuthenticationSession
-import platform.Foundation.NSError
-import platform.Foundation.NSURL
-import platform.Foundation.NSURLComponents
-import platform.Foundation.NSURLQueryItem
-import platform.Foundation.NSUserDefaults
-import platform.SafariServices.SFSafariViewController
-import platform.SafariServices.SFSafariViewControllerDelegateProtocol
-import platform.UIKit.UIApplication
-import platform.UIKit.UIScreen
-import platform.UIKit.UIUserInterfaceStyle
-import platform.UIKit.UIWindow
 import platform.darwin.NSObject
-import platform.darwin.NSUInteger
+import platform.objc.sel_registerName
 
 private val defaults = NSUserDefaults.standardUserDefaults
 
@@ -48,7 +39,6 @@ actual fun clearData() {
     defaults.removeObjectForKey("session_token")
     defaults.removeObjectForKey("session_data")
 }
-
 
 private var webAuthSession: ASWebAuthenticationSession? = null
 
@@ -110,31 +100,182 @@ actual fun startOAuth(provider: String, callback: OAuthCallback) {
         }
 
     webAuthSession?.presentationContextProvider = contextProvider
-    webAuthSession?.prefersEphemeralWebBrowserSession = true
+    webAuthSession?.prefersEphemeralWebBrowserSession = false
     webAuthSession?.start()
 }
 
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
-    val webAuthSession = ASWebAuthenticationSession(
-        uRL = NSURL.URLWithString(url)!!,
-        callbackURLScheme = null
-    ) { callbackURL, error ->
-        if (error != null) {
-            callback(WebPageState.Finished(url, error.code.toString(), error.localizedDescription))
-        } else if (callbackURL != null) {
+    val configuration = WKWebViewConfiguration()
+
+    val viewController = object : UIViewController(nibName = null, bundle = null), WKNavigationDelegateProtocol {
+        private lateinit var webView: WKWebView
+        private lateinit var toolBar: UIToolbar
+        private lateinit var backButton: UIBarButtonItem
+        private lateinit var forwardButton: UIBarButtonItem
+        private lateinit var urlLabel: UILabel
+
+        override fun loadView() {
+            view = UIView()
+            view.backgroundColor = UIColor.systemBackgroundColor
+
+            // 创建 webView
+            val rect = CGRectMake(0.0, 0.0, 0.0, 0.0)
+            webView = WKWebView(frame = rect, configuration = configuration)
+            webView.setNavigationDelegate(this)
+            webView.setTranslatesAutoresizingMaskIntoConstraints(false)
+            view.addSubview(webView)
+
+            // 创建底部工具栏
+            toolBar = UIToolbar()
+            toolBar.setTranslatesAutoresizingMaskIntoConstraints(false)
+            view.addSubview(toolBar)
+
+            // 设置约束
+            NSLayoutConstraint.activateConstraints(listOf(
+                webView.topAnchor.constraintEqualToAnchor(view.safeAreaLayoutGuide.topAnchor),
+                webView.leadingAnchor.constraintEqualToAnchor(view.leadingAnchor),
+                webView.trailingAnchor.constraintEqualToAnchor(view.trailingAnchor),
+                webView.bottomAnchor.constraintEqualToAnchor(toolBar.topAnchor),
+
+                toolBar.leadingAnchor.constraintEqualToAnchor(view.leadingAnchor),
+                toolBar.trailingAnchor.constraintEqualToAnchor(view.trailingAnchor),
+                toolBar.bottomAnchor.constraintEqualToAnchor(view.safeAreaLayoutGuide.bottomAnchor)
+            ))
+        }
+
+        override fun viewDidLoad() {
+            super.viewDidLoad()
+
+            // 设置顶部导航栏
+            val closeButton = UIBarButtonItem(
+                image = UIImage.systemImageNamed("xmark"),
+                style = UIBarButtonItemStyle.UIBarButtonItemStylePlain,
+                target = this,
+                action = sel_registerName("closeButtonTapped")
+            )
+
+            // 创建中间的 URL 标签
+            urlLabel = UILabel().apply {
+                text = NSURL.URLWithString(url)?.host ?: url
+                textAlignment = NSTextAlignmentCenter
+                setTranslatesAutoresizingMaskIntoConstraints(false)
+                setUserInteractionEnabled(true)
+                addGestureRecognizer(UITapGestureRecognizer(target = this, action = sel_registerName("copyUrlButtonTapped")))
+            }
+
+            val refreshButton = UIBarButtonItem(
+                image = UIImage.systemImageNamed("arrow.clockwise"),
+                style = UIBarButtonItemStyle.UIBarButtonItemStylePlain,
+                target = webView,
+                action = sel_registerName("reload")
+            )
+
+            navigationItem.setLeftBarButtonItem(closeButton)
+            navigationItem.titleView = urlLabel
+            navigationItem.setRightBarButtonItem(refreshButton)
+
+            // 设置底部工具栏
+            backButton = UIBarButtonItem(
+                image = UIImage.systemImageNamed("chevron.backward"),
+                style = UIBarButtonItemStyle.UIBarButtonItemStylePlain,
+                target = webView,
+                action = sel_registerName("goBack")
+            )
+
+            forwardButton = UIBarButtonItem(
+                image = UIImage.systemImageNamed("chevron.forward"),
+                style = UIBarButtonItemStyle.UIBarButtonItemStylePlain,
+                target = webView,
+                action = sel_registerName("goForward")
+            )
+
+            val shareButton = UIBarButtonItem(
+                image = UIImage.systemImageNamed("square.and.arrow.up"),
+                style = UIBarButtonItemStyle.UIBarButtonItemStylePlain,
+                target = this,
+                action = sel_registerName("shareButtonTapped")
+            )
+
+            val safariButton = UIBarButtonItem(
+                image = UIImage.systemImageNamed("safari"),
+                style = UIBarButtonItemStyle.UIBarButtonItemStylePlain,
+                target = this,
+                action = sel_registerName("openInSafariTapped")
+            )
+
+            val flexSpace = UIBarButtonItem(
+                barButtonSystemItem = UIBarButtonSystemItem.UIBarButtonSystemItemFlexibleSpace,
+                target = null,
+                action = null
+            )
+
+            // 创建顶部间距的空白项
+            val topSpaceItem = UIBarButtonItem(
+                customView = UIView().apply {
+                    setTranslatesAutoresizingMaskIntoConstraints(false)
+                    heightAnchor.constraintEqualToConstant(8.0).setActive(true)
+                }
+            )
+            
+            toolBar.setItems(listOf(
+                topSpaceItem,
+                backButton, flexSpace,
+                forwardButton, flexSpace,
+                shareButton, flexSpace,
+                safariButton
+            ), animated = false)
+            
+            // 设置工具栏内边距
+            toolBar.setLayoutMargins(UIEdgeInsetsMake(8.0, 0.0, 0.0, 0.0))
+
+            // 加载 URL
+            webView.loadRequest(NSURLRequest.requestWithURL(NSURL.URLWithString(url)!!))
+        }
+
+        // WKNavigationDelegate
+        override fun webView(
+            webView: WKWebView,
+            didFinishNavigation: WKNavigation?
+        ) {
+            backButton.setEnabled(webView.canGoBack)
+            forwardButton.setEnabled(webView.canGoForward)
+            urlLabel.text = webView.URL?.host ?: url
+        }
+
+        @ObjCAction
+        fun closeButtonTapped() {
+            dismissViewControllerAnimated(flag = true, completion = null)
             callback(WebPageState.Finished(url, "0", "User closed the page"))
-        } else {
-            callback(WebPageState.Finished(url, "-9999", "Unknown error"))
+        }
+
+        @ObjCAction
+        fun copyUrlButtonTapped() {
+            UIPasteboard.generalPasteboard.string = webView.URL?.absoluteString ?: url
+        }
+
+        @ObjCAction
+        fun shareButtonTapped() {
+            val items = listOf(webView.URL ?: NSURL.URLWithString(url)!!)
+            val activityVC = UIActivityViewController(
+                activityItems = items,
+                applicationActivities = null
+            )
+            presentViewController(activityVC, animated = true, completion = null)
+        }
+
+        @ObjCAction
+        fun openInSafariTapped() {
+            val nsurl = webView.URL ?: NSURL.URLWithString(url)!!
+            UIApplication.sharedApplication.openURL(
+                url = nsurl,
+                options = mapOf<Any?, Any?>(),
+                completionHandler = null
+            )
         }
     }
 
-    val contextProvider = object : NSObject(), ASWebAuthenticationPresentationContextProvidingProtocol {
-        override fun presentationAnchorForWebAuthenticationSession(session: ASWebAuthenticationSession): UIWindow {
-            return UIApplication.sharedApplication.keyWindow!!
-        }
-    }
-
-    webAuthSession.presentationContextProvider = contextProvider
-    webAuthSession.prefersEphemeralWebBrowserSession = true
-    webAuthSession.start()
+    val navigationController = UINavigationController(rootViewController = viewController)
+    UIApplication.sharedApplication.keyWindow?.rootViewController?.
+        presentViewController(navigationController, animated = true, completion = null)
 }
