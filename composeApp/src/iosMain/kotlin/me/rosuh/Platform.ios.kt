@@ -113,7 +113,7 @@ actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
         private lateinit var toolBar: UIToolbar
         private lateinit var backButton: UIBarButtonItem
         private lateinit var forwardButton: UIBarButtonItem
-        private lateinit var urlLabel: UILabel
+        private lateinit var urlButton: UIButton
 
         override fun loadView() {
             view = UIView()
@@ -154,14 +154,16 @@ actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
                 target = this,
                 action = sel_registerName("closeButtonTapped")
             )
-
-            // 创建中间的 URL 标签
-            urlLabel = UILabel().apply {
-                text = NSURL.URLWithString(url)?.host ?: url
-                textAlignment = NSTextAlignmentCenter
+            val it = this
+            // 创建中间的 URL 按钮
+            urlButton = UIButton.buttonWithType(UIButtonTypeSystem).apply {
+                setTitle(NSURL.URLWithString(url)?.host ?: url, UIControlStateNormal)
                 setTranslatesAutoresizingMaskIntoConstraints(false)
-                setUserInteractionEnabled(true)
-                addGestureRecognizer(UITapGestureRecognizer(target = this, action = sel_registerName("copyUrlButtonTapped")))
+                addTarget(
+                    target = it,
+                    action = sel_registerName("copyUrlButtonTapped"),
+                    forControlEvents = UIControlEventTouchUpInside
+                )
             }
 
             val refreshButton = UIBarButtonItem(
@@ -172,7 +174,7 @@ actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
             )
 
             navigationItem.setLeftBarButtonItem(closeButton)
-            navigationItem.titleView = urlLabel
+            navigationItem.titleView = urlButton
             navigationItem.setRightBarButtonItem(refreshButton)
 
             // 设置底部工具栏
@@ -240,7 +242,7 @@ actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
         ) {
             backButton.setEnabled(webView.canGoBack)
             forwardButton.setEnabled(webView.canGoForward)
-            urlLabel.text = webView.URL?.host ?: url
+            urlButton.setTitle(webView.URL?.host ?: url, UIControlStateNormal)
         }
 
         @ObjCAction
@@ -252,6 +254,22 @@ actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
         @ObjCAction
         fun copyUrlButtonTapped() {
             UIPasteboard.generalPasteboard.string = webView.URL?.absoluteString ?: url
+            
+            // 触觉反馈
+            val generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
+            
+            // 显示提示
+            val alert = UIAlertController.alertControllerWithTitle(
+                title = null,
+                message = "已复制链接",
+                preferredStyle = UIAlertControllerStyleAlert
+            )
+            presentViewController(alert, animated = true) {
+                // 0.8秒后自动消失
+                NSThread.sleepForTimeInterval(0.8)
+                alert.dismissViewControllerAnimated(true, completion = null)
+            }
         }
 
         @ObjCAction
