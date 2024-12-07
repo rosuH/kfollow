@@ -1,4 +1,6 @@
 package me.rosuh.data
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -20,6 +22,11 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import me.rosuh.FLog
@@ -48,7 +55,7 @@ object NetworkManager {
                     FLog.v("NetworkManager", message)
                 }
             }
-            level = LogLevel.BODY
+            level = LogLevel.INFO
         }
         install(HttpCookies)
         install(HttpTimeout) {

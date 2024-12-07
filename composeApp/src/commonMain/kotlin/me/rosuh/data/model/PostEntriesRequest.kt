@@ -101,8 +101,8 @@ data class User(
 data class Media(
     val type: String,
     val url: String,
-    val width: Int? = null,
-    val height: Int? = null,
+    val width: Double? = null,
+    val height: Double? = null,
     @SerialName("preview_image_url") val previewImageUrl: String? = null,
     val blurhash: String? = null
 )

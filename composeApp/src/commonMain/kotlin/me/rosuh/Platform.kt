@@ -1,5 +1,7 @@
 package me.rosuh
 
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
+import androidx.compose.runtime.Composable
 import me.rosuh.data.OAuthCallback
 import me.rosuh.data.SessionResponse
 
@@ -32,3 +34,6 @@ sealed class WebPageState {
         WebPageState()
 }
 expect fun openWebPage(url: String, callback: (WebPageState) -> Unit)
+
+@Composable
+expect fun calculateWindowSizeClass(): WindowSizeClass

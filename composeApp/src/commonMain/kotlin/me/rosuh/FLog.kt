@@ -4,21 +4,21 @@ import io.github.aakira.napier.Napier
 
 object FLog {
     fun v(tag: String, message: String, throwable: Throwable? = null) {
-        Napier.v(tag, throwable, message)
+        Napier.v(message, throwable, tag)
     }
     fun d(tag: String, message: String, throwable: Throwable? = null) {
-        Napier.d(tag, throwable, message)
+        Napier.d(message, throwable, tag)
     }
     fun i(tag: String, message: String, throwable: Throwable? = null) {
-        Napier.i(tag, throwable, message)
+        Napier.i(message, throwable, tag)
     }
     fun w(tag: String, message: String, throwable: Throwable? = null) {
-        Napier.w(tag, throwable, message)
+        Napier.w(message, throwable, tag)
     }
     fun e(tag: String, message: String, throwable: Throwable? = null) {
-        Napier.e(tag, throwable, message)
+        Napier.e(message, throwable, tag)
     }
     fun wtf(tag: String, message: String, throwable: Throwable? = null) {
-        Napier.wtf(tag, throwable, message)
+        Napier.wtf(message, throwable, tag)
     }
 }

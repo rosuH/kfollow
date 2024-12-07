@@ -1,5 +1,8 @@
 package me.rosuh
 
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
+import androidx.compose.runtime.Composable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -85,4 +88,10 @@ actual fun startOAuth(provider: String, callback: OAuthCallback) {
 actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
     // open url in default browser
     Desktop.getDesktop().browse(URI(url))
+}
+
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+@Composable
+actual fun calculateWindowSizeClass(): WindowSizeClass {
+    return androidx.compose.material3.windowsizeclass.calculateWindowSizeClass()
 }

@@ -66,6 +66,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -114,6 +116,7 @@ import me.rosuh.Icon.ImgPlaceholder
 import me.rosuh.Icon.Play
 import me.rosuh.data.api.SubscriptionType
 import me.rosuh.data.api.subscriptionType
+import me.rosuh.data.api.subscriptionTypeList
 import me.rosuh.data.api.subscriptionTypeListTitle
 import me.rosuh.data.model.EntryData
 import me.rosuh.data.model.cover
@@ -334,6 +337,11 @@ fun HomeScreen(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
             tabState = page
+            mainViewModel.processAction(
+                MainViewModel.Action.LoadHome(
+                    subscriptionTypeList[page], isRefresh = false
+                )
+            )
         }
     }
     Scaffold(topBar = {
@@ -615,6 +623,14 @@ fun VideoScreen(
     BaseHomeContentScreen(
         modifier = modifier, isRefreshing = videoState is LoadState.Loading, onLoadHome = onLoadHome
     ) {
+        val size = calculateWindowSizeClass()
+        val cellWidth = remember {
+            if (size.widthSizeClass == WindowWidthSizeClass.Compact) {
+                StaggeredGridCells.Fixed(2)
+            } else {
+                StaggeredGridCells.Adaptive(190.dp)
+            }
+        }
         when {
             videoState is LoadState.Error && videoState.data?.subscriptionEntriesMap.isNullOrEmpty() -> {
                 ErrorScreen(videoState) {
@@ -624,7 +640,7 @@ fun VideoScreen(
 
             videoState is LoadState.Success -> {
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Adaptive(190.dp),
+                    columns = cellWidth,
                     modifier = Modifier.fillMaxSize(),
                     verticalItemSpacing = 4.dp,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -648,6 +664,14 @@ fun ImageScreen(
     BaseHomeContentScreen(
         modifier = modifier, isRefreshing = imageState is LoadState.Loading, onLoadHome = onLoadHome
     ) {
+        val size = calculateWindowSizeClass()
+        val cellWidth = remember {
+            if (size.widthSizeClass == WindowWidthSizeClass.Compact) {
+                StaggeredGridCells.Fixed(2)
+            } else {
+                StaggeredGridCells.Adaptive(190.dp)
+            }
+        }
         when {
             imageState is LoadState.Error && imageState.data?.subscriptionEntriesMap.isNullOrEmpty() -> {
                 ErrorScreen(imageState) {
@@ -657,7 +681,7 @@ fun ImageScreen(
 
             imageState is LoadState.Success -> {
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Adaptive(190.dp),
+                    columns = cellWidth,
                     contentPadding = PaddingValues(4.dp),
                     modifier = Modifier.fillMaxSize(),
                     verticalItemSpacing = 4.dp,
@@ -897,9 +921,6 @@ fun BaseHomeContentScreen(
     onLoadHome: (isRefresh: Boolean, isAppend: Boolean) -> Unit,
     content: @Composable () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        onLoadHome(false, false)
-    }
     val pullToRefreshState = rememberPullToRefreshState()
     PullToRefreshBox(modifier = modifier,
         state = pullToRefreshState,

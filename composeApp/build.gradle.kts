@@ -40,6 +40,10 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
+                implementation(libs.compose.material3.window.size)
+                implementation(libs.compose.material3.adaptive)
+                implementation(libs.compose.material3.adaptive.layout)
+                implementation(libs.compose.material3.adaptive.navigation)
                 implementation(compose.ui)
                 implementation(compose.components.resources)
                 implementation(compose.components.uiToolingPreview)
@@ -86,7 +90,12 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation(compose.preview)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation(compose.components.uiToolingPreview)
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.kotlinx.serialization.json)

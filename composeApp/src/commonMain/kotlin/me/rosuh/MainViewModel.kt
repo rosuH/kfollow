@@ -7,9 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.ktor.http.Url
 import io.ktor.util.collections.ConcurrentMap
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -23,6 +23,7 @@ import me.rosuh.data.AuthService
 import me.rosuh.data.NetworkManager
 import me.rosuh.data.OAuthCallback
 import me.rosuh.data.OAuthError
+import me.rosuh.data.SubscriptionRepository
 import me.rosuh.data.api.EntriesApi
 import me.rosuh.data.api.SubscriptionType
 import me.rosuh.data.api.SubscriptionsApi
@@ -30,6 +31,8 @@ import me.rosuh.data.model.EntryData
 import me.rosuh.data.model.PostEntriesResponse
 import me.rosuh.data.model.SubscriptionsResponse
 import me.rosuh.data.model.cover
+import me.rosuh.utils.Either
+import me.rosuh.utils.fold
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -171,10 +174,8 @@ class MainViewModel : ViewModel() {
 
     private val authService = AuthService()
     private val entriesApi = EntriesApi()
-    private val subscriptionApi = SubscriptionsApi()
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val subscriptionRepository = SubscriptionRepository()
 
-    private var loadSubscriptionDeffer: Deferred<Unit>? = null
 
     private var subscriptionsListLoadState: LoadState<SubscriptionsResponse>? = null
 
@@ -199,6 +200,12 @@ class MainViewModel : ViewModel() {
         LoginState.Success(false, it)
     } ?: LoginState.Idle)
 
+    init {
+        viewModelScope.launch {
+            loadHome(Action.LoadHome(SubscriptionType.Article))
+        }
+    }
+
     private fun getAndSetSessionToken(): String? {
         return getSessionToken()?.takeIf {
             getSessionData()?.isExpired() == false && it.isNotBlank()
@@ -210,25 +217,25 @@ class MainViewModel : ViewModel() {
     fun processAction(action: Action) {
         when (action) {
             is Action.Login -> {
-                scope.launch {
+                viewModelScope.launch {
                     login(action.provider)
                 }
             }
 
             Action.Initialize -> {
-                scope.launch {
+                viewModelScope.launch {
                     initialize()
                 }
             }
 
             is Action.LoadHome -> {
-                scope.launch {
+                viewModelScope.launch {
                     loadHome(action)
                 }
             }
 
             is Action.GoDetail -> {
-                scope.launch {
+                viewModelScope.launch {
                     openWebPage(action.entryData.entries.url ?: action.entryData.entries.guid) { webPageState ->
                         FLog.i(TAG, "web page state: $webPageState")
                     }
@@ -250,7 +257,7 @@ class MainViewModel : ViewModel() {
         updateMainState {
             updateSubscriptionState(subscriptionType, LoadState.Loading(action.isRefresh, retryCount, false))
         }
-        FLog.d(TAG, "load home: $subscriptionType, append: $append")
+        FLog.d(TAG, "load home 1: $subscriptionType, append: $append")
         val currentSubscriptions = (mainState.getViewState(subscriptionType) as? LoadState.Success)?.data?.subscriptionEntriesMap?.keys ?: emptyList()
         val subscription = if (action.isRefresh || currentSubscriptions.isEmpty()) {
             // 刷新时，重新加载订阅列表
@@ -274,7 +281,13 @@ class MainViewModel : ViewModel() {
             }
             return@withContext
         }
-        FLog.d(TAG, "load home: $subscriptionType, append: $append, retryCount: $retryCount")
+        if (subscription.isEmpty()) {
+            updateMainState {
+                updateSubscriptionState(subscriptionType, LoadState.Success(SubscriptionWithEntries()))
+            }
+            return@withContext
+        }
+        FLog.d(TAG, "load home2 : $subscriptionType, append: $append, retryCount: $retryCount, subscription.size: ${subscription.size}")
         homeReqMap[subscriptionType]?.forEach { it.cancel() }
         homeReqMap[subscriptionType] = emptyList()
         // 并发获取每个列表的数据
@@ -282,7 +295,7 @@ class MainViewModel : ViewModel() {
             async {
                 try {
                     val entriesState = LoadState.Loading<PostEntriesResponse>(isRefresh = action.isRefresh)
-                    FLog.d(TAG, "load home: $subscriptionType, append: $append, mapSize: ${mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap?.size}")
+                    FLog.d(TAG, "load home3: $subscriptionType, append: $append, mapSize: ${mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap?.size}")
                     val result = when (subscriptionType) {
                         SubscriptionType.Article, SubscriptionType.Notification -> {
                             LoadState.Success(entriesApi.postListEntries(listId = it.feedId, view = it.view))
@@ -308,7 +321,7 @@ class MainViewModel : ViewModel() {
                                 append
                             )
                         )
-                        FLog.d(TAG, "load home success: $subscriptionType, append: $append, mapSize: ${mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap?.size}, result.size=${result.data.data?.size}")
+                        FLog.d(TAG, "load home4 success: $subscriptionType, append: $append, mapSize: ${mainState.getViewState(subscriptionType).data?.subscriptionEntriesMap?.size}, result.size=${result.data.data?.size}")
                     }
                 } catch (e: Exception) {
                     FLog.e(TAG, "load home error: ${e.message}")
@@ -339,9 +352,6 @@ class MainViewModel : ViewModel() {
     private suspend fun initialize() = withContext(Dispatchers.IO) {
         FLog.i(TAG, "initialize")
         if (getAndSetSessionToken() != null) {
-            loadSubscriptionDeffer = async {
-                loadSubscription()
-            }
             updateMainState {
                 loginState = LoginState.Success(false, getSessionToken()!!)
             }
@@ -430,26 +440,26 @@ class MainViewModel : ViewModel() {
     private suspend fun loadSubscription(
         view: Int? = null
     ): LoadState<SubscriptionsResponse> = withContext(Dispatchers.IO) {
-        if (loadSubscriptionDeffer?.isActive == true) {
-            return@withContext LoadState.Loading(false)
-        }
-        FLog.d(TAG, "load subscription")
+        FLog.d(TAG, "load subscription view: $view")
         subscriptionsListLoadState = LoadState.Loading(false)
-        val subscriptions = kotlin.runCatching { subscriptionApi.getSubscriptions(view) }
-            .getOrElse {
-                FLog.e(TAG, "load subscription error: ${it.message}")
-                subscriptionsListLoadState = LoadState.Error(it)
-                return@withContext LoadState.Error(it)
+        when (val either = subscriptionRepository.loadSubscription(view)) {
+            is Either.Right -> {
+                val subscriptions = either.value
+                subscriptions.data.forEach {
+                    feedIconCache.put(
+                        it.feedId,
+                        it.cover
+                    )
+                }
+                subscriptionsListLoadState = LoadState.Success(subscriptions)
+                return@withContext LoadState.Success(subscriptions)
             }
-        FLog.d(TAG, "load subscription success ${subscriptions.data.size}")
-        subscriptions.data.forEach {
-            feedIconCache.put(
-                it.feedId,
-                it.cover
-            )
+
+            is Either.Left -> {
+                subscriptionsListLoadState = LoadState.Error(either.value)
+                return@withContext LoadState.Error(either.value)
+            }
         }
-        subscriptionsListLoadState = LoadState.Success(subscriptions)
-        return@withContext LoadState.Success(subscriptions)
     }
 
     private val urlCache by lazy {

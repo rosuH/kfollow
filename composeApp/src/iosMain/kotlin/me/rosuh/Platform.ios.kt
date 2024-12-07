@@ -1,5 +1,8 @@
 package me.rosuh
 
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
+import androidx.compose.runtime.Composable
 import platform.WebKit.*
 import platform.UIKit.*
 import platform.Foundation.*
@@ -296,4 +299,10 @@ actual fun openWebPage(url: String, callback: (WebPageState) -> Unit) {
     val navigationController = UINavigationController(rootViewController = viewController)
     UIApplication.sharedApplication.keyWindow?.rootViewController?.
         presentViewController(navigationController, animated = true, completion = null)
+}
+
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+@Composable
+actual fun calculateWindowSizeClass(): WindowSizeClass {
+    return androidx.compose.material3.windowsizeclass.calculateWindowSizeClass()
 }
