@@ -53,6 +53,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults.iconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -66,10 +68,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -112,6 +114,8 @@ import dev.chrisbanes.haze.materials.HazeMaterials
 import kfollow.composeapp.generated.resources.Res
 import kfollow.composeapp.generated.resources.logo
 import kotlinx.coroutines.launch
+import me.rosuh.Icon.AudioMoreFeeds
+import me.rosuh.Icon.AudioPlaySolid
 import me.rosuh.Icon.ImgPlaceholder
 import me.rosuh.Icon.Play
 import me.rosuh.data.api.SubscriptionType
@@ -122,7 +126,6 @@ import me.rosuh.data.model.EntryData
 import me.rosuh.data.model.cover
 import me.rosuh.data.model.realTitle
 import me.rosuh.ui.theme.AppTheme
-import me.rosuh.ui.theme.brandColor
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
@@ -464,9 +467,21 @@ fun HomeScreen(
 
                 SubscriptionType.Audio -> {
                     AudioScreen(
-                        mainViewModel,
-                        onPullToRefresh,
-                        onGoDetail = { mainViewModel.processAction(MainViewModel.Action.GoDetail(it)) }
+                        mainViewModel.mainState.audioState,
+                        modifier = pageModifier,
+                        onLoadHome = { isRefresh: Boolean, isAppend: Boolean ->
+                            mainViewModel.processAction(
+                                MainViewModel.Action.LoadHome(
+                                    SubscriptionType.Audio,
+                                    append = isAppend,
+                                    isRefresh = isRefresh
+                                )
+                            )
+                        },
+                        onGoDetail = { mainViewModel.processAction(MainViewModel.Action.GoDetail(it)) },
+                        goFeedList = {
+                            // todo
+                        }
                     )
                 }
 
@@ -483,16 +498,10 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TabIndicatorScope.FancyAnimatedIndicatorWithModifier(index: Int) {
-    val colors = listOf(
-        brandColor,
-        brandColor.copy(alpha = 0.8f),
-        brandColor.copy(alpha = 0.3f),
-    )
     var startAnimatable by remember { mutableStateOf<Animatable<Dp, AnimationVector1D>?>(null) }
     var endAnimatable by remember { mutableStateOf<Animatable<Dp, AnimationVector1D>?>(null) }
     val coroutineScope = rememberCoroutineScope()
-    val indicatorColor: Color by animateColorAsState(brandColor)
-    val density = LocalDensity.current
+    val indicatorColor: Color by animateColorAsState(MaterialTheme.colorScheme.primary)
 
     // 添加一个动画值来控制水滴变形程度
     val deformationAnimatable = remember { Animatable(0f) }
@@ -606,11 +615,168 @@ fun NotificationScreen(
 
 @Composable
 fun AudioScreen(
-    mainViewModel: MainViewModel,
-    onPullToRefresh: (SubscriptionType) -> Unit,
-    onGoDetail: (EntryData) -> Unit = {}
+    audioState: LoadState<SubscriptionWithEntries>,
+    modifier: Modifier = Modifier.fillMaxSize(),
+    onLoadHome: (isRefresh: Boolean, isAppend: Boolean) -> Unit,
+    onGoDetail: (EntryData) -> Unit = {},
+    goFeedList: (type: SubscriptionType) -> Unit = { _ -> }
 ) {
+    BaseHomeContentScreen(
+        modifier = modifier, isRefreshing = audioState is LoadState.Loading, onLoadHome = onLoadHome
+    ) {
+        when {
+            audioState is LoadState.Error && audioState.data?.subscriptionEntriesMap.isNullOrEmpty() -> {
+                ErrorScreen(audioState) {
+                    onLoadHome(true, false)
+                }
+            }
 
+            audioState is LoadState.Success -> {
+                val feedList = remember {
+                    audioState.data.feeds.take(7)
+                }
+                val isMoreThan7 = remember {
+                    audioState.data.feeds.size > 7
+                }
+                val cellSize = remember {
+                    72.dp
+                }
+                val gridHeight = remember {
+                    derivedStateOf {
+                        if (feedList.size >= 4) {
+                            cellSize * 2 + 16.dp
+                        } else {
+                            cellSize + 16.dp
+                        }
+                    }
+                }
+                val size = calculateWindowSizeClass()
+                val gridWidthModifier = remember {
+                    derivedStateOf {
+                        if (size.widthSizeClass == WindowWidthSizeClass.Compact) {
+                            Modifier.fillMaxWidth().padding(bottom = 10.dp).height(gridHeight.value)
+                        } else {
+                            Modifier.width(360.dp).padding(bottom = 10.dp).height(gridHeight.value)
+                        }
+                    }
+                }
+                val gridColumns = remember {
+                    if (size.widthSizeClass == WindowWidthSizeClass.Compact) {
+                        GridCells.Fixed(4)
+                    } else {
+                        GridCells.Adaptive(72.dp)
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = rememberLazyListState(),
+                    contentPadding = PaddingValues(4.dp)
+                ) {
+                    item {
+                        LazyVerticalGrid(
+                            columns = gridColumns,
+                            modifier = gridWidthModifier.value,
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            userScrollEnabled = false
+                        ) {
+                            items(feedList) { item ->
+                                AsyncImage(
+                                    model = item.cover,
+                                    contentDescription = item.title,
+                                    modifier = Modifier.height(72.dp).clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            if (isMoreThan7) {
+                                item {
+                                    // More button
+                                    IconButton(
+                                        onClick = {
+                                            goFeedList(SubscriptionType.Audio)
+                                        },
+                                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))
+                                    ) {
+                                        Icon(
+                                            AudioMoreFeeds,
+                                            contentDescription = "More",
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    items(audioState.data.allEntries) { item ->
+                        AudioFeedItem(Modifier.clickable { onGoDetail(item) }, item, onClick = {
+                            onGoDetail(item)
+                        })
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                            thickness = 0.5.dp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AudioFeedItem(
+    clickable: Modifier,
+    item: EntryData,
+    onClick: () -> Unit = {}
+) {
+    Row(
+        modifier = clickable
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        AsyncImage(
+            model = item.feeds.cover,
+            contentDescription = item.entries.title,
+            modifier = Modifier.size(90.dp).clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(20.dp))
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                Text(
+                    text = item.entries.realTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = item.feeds.title ?: "",
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(15.dp))
+                Text(
+                    text = item.entries.publishedDate,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+            }
+            IconButton(
+                onClick = onClick,
+                modifier = Modifier.size(36.dp).align(Alignment.BottomEnd),
+                colors = iconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                )
+            ) {
+                Icon(
+                    AudioPlaySolid,
+                    contentDescription = "Play",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable

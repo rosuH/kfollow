@@ -70,11 +70,17 @@ data class SubscriptionWithEntries(
         Uuid.random().toString()
     }
 
-    val allEntries: List<EntryData> = subscriptionEntriesMap.values.mapNotNull {
-        (it as? LoadState.Success)?.data?.data ?: emptyList()
-    }.flatten().sortedByDescending {
-        it.entries.publishedAt
-    }
+    // fixme improve list performance && update UI was missing sometimes
+    val feeds: List<SubscriptionsResponse.Subscription>
+        get() = subscriptionEntriesMap.keys.toList()
+
+    // fixme improve list performance
+    val allEntries: List<EntryData>
+        get() = subscriptionEntriesMap.values.mapNotNull {
+            (it as? LoadState.Success)?.data?.data ?: emptyList()
+        }.flatten().sortedByDescending {
+            it.entries.publishedAt
+        }
 }
 
 /**
