@@ -467,49 +467,57 @@ class MainViewModel : ViewModel() {
     }
 
     private val urlCache by lazy {
-        LruCache<String, Pair<String, String>>(10)
+        LruCache<String, String>(10)
     }
     private val feedIconCache by lazy {
         LruCache<String, String>(10)
     }
 
-    private suspend fun getUrlIcon(url: String): Pair<String, String> =
+    private suspend fun getUrlIcon(url: String): String =
         withContext(Dispatchers.IO) {
             // 1. 首先尝试从 URL 中提取主机名（host）
-            val host = try {
-                Url(url).host
+            val mainDomain = try {
+                Url(url).extractMainDomain()
             } catch (e: Exception) {
                 url
             }
             // 1.1 如果缓存中有，直接返回
-            urlCache[host]?.let {
+            urlCache[mainDomain]?.let {
                 return@withContext it
             }
             // 2. 获取纯域名（例如：从 www.example.com 获取 example）
-            val pureDomain = host.split(".").let {
+            val pureDomain = mainDomain.split(".").let {
                 if (it.size > 2) {
                     it[it.size - 2]
                 } else {
                     it.first()
                 }
             }
-
             // 3. 生成备用图标 URL（使用域名前两个字母作为文本）
             val fallbackUrl =
                 "https://avatar.vercel.sh/$pureDomain.svg?text=${pureDomain.take(2).uppercase()}"
 
             // 4. 如果 host 与原始 url 相同（说明 URL 解析失败），使用备用图标
             // 否则使用 unavatar.webp.se 服务获取图标
-            val src = if (host == url) {
-                fallbackUrl
-            } else {
-                "https://unavatar.webp.se/$host?fallback=$fallbackUrl"
-            }
+            val src = "https://unavatar.webp.se/$mainDomain?fallback=$fallbackUrl"
+//            val src = "https://favicon.im/zh/${mainDomain}?larger=true"
+//            val src = "https://www.google.com/s2/favicons?domain=${mainDomain}&sz=128"
 
-            // 5. 主图标 URL 和备用图标 URL 的配对写入缓存
-            urlCache.put(host, src to fallbackUrl)
-            return@withContext src to fallbackUrl
+            FLog.i(TAG, "getIconUrl for $url: $src")
+
+            urlCache.put(mainDomain, src)
+            return@withContext src
         }
+
+    private fun Url.extractMainDomain(): String {
+        val parts = host.split(".")
+        return if (parts.size >= 2) {
+            "${parts[parts.size - 2]}.${parts.last()}" // 例如：www.example.com -> example.com
+        } else {
+            host // 如果只有一层或更少，则直接返回
+        }
+    }
+
 
     private suspend fun updateMainState(reducer: MainState.() -> Unit) {
         coroutineScope {

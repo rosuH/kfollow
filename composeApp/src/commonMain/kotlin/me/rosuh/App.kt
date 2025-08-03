@@ -976,7 +976,7 @@ private fun SocialMediaItem(
             // Avatar
             AsyncImage(
                 model = ImageRequest.Builder(LocalPlatformContext.current)
-                    .data(entryData.entries.icon.first).crossfade(true).build(),
+                    .data(entryData.entries.icon).crossfade(true).build(),
                 contentDescription = "Avatar",
                 modifier = Modifier.size(40.dp).clip(CircleShape),
                 contentScale = ContentScale.FillBounds
@@ -1166,7 +1166,7 @@ fun ArticleScreen(
                                 val data = (entries as? LoadState.Success)?.data
                                     ?: (entries as? LoadState.Loading)?.data
                                 items(data?.data ?: emptyList(),
-                                    key = { item: EntryData -> item.entries.id }) { item ->
+                                    key = { item: EntryData -> "${subscription.feedId}-${item.entries.id}" }) { item ->
                                     Row(
                                         modifier = Modifier.clickable {
                                             onGoDetail.invoke(item)
@@ -1177,9 +1177,9 @@ fun ArticleScreen(
                                     ) {
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalPlatformContext.current)
-                                                .data(item.entries.icon.first).crossfade(true)
+                                                .data(item.entries.icon).crossfade(true)
                                                 .build(),
-                                            contentScale = ContentScale.Crop,
+                                            contentScale = ContentScale.Fit,
                                             contentDescription = "Website icon",
                                             modifier = Modifier.size(60.dp)
                                                 .clip(MaterialTheme.shapes.medium)

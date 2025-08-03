@@ -36,7 +36,8 @@ data class EntryData(
     val read: Boolean? = null,
     val view: Int? = null,
     val collections: Collections? = null,
-    val settings: Settings? = null
+    val settings: Settings? = null,
+    val from: List<String> = emptyList<String>()
 )
 
 @Serializable
@@ -63,7 +64,7 @@ data class Entry(
         publishedAt.formatPublishedAt()
     }
 
-    var icon: Pair<String, String> = Pair("", "")
+    var icon: String = ""
 }
 
 val Feed.cover: String
