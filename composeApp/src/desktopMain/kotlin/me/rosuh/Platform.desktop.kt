@@ -20,11 +20,11 @@ private val prefs by lazy {
     Preferences.userRoot().node("auth")
 }
 
-actual fun saveSessionToken(token: String) {
+actual fun saveAuthCookieToken(token: String) {
     prefs.put("session_token", token)
 }
 
-actual fun getSessionToken(): String? {
+actual fun getAuthCookieToken(): String? {
     return prefs.get("session_token", null)
 }
 

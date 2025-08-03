@@ -1,11 +1,10 @@
 package me.rosuh.data
-import io.github.aakira.napier.DebugAntilog
-import io.github.aakira.napier.Napier
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.plugins.cookies.cookies
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -15,26 +14,17 @@ import io.ktor.client.plugins.resources.delete
 import io.ktor.client.plugins.resources.get
 import io.ktor.client.plugins.resources.post
 import io.ktor.client.plugins.resources.put
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.cookie
 import io.ktor.client.request.header
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
 import me.rosuh.FLog
 
 object NetworkManager {
     const val BASE_URL = "https://api.follow.is"
-    internal var sessionToken: String = ""
-    internal var csrfToken: String = ""
+    
+    var cookieAuthToken: String? = null
 
     val json by lazy {
         Json {
@@ -55,7 +45,7 @@ object NetworkManager {
                     FLog.v("NetworkManager", message)
                 }
             }
-            level = LogLevel.INFO
+            level = LogLevel.ALL
         }
         install(HttpCookies)
         install(HttpTimeout) {
@@ -65,66 +55,94 @@ object NetworkManager {
         }
         defaultRequest {
             url(BASE_URL)
+            // Add standard browser headers for better compatibility
+            header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+            header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+            header("DNT", "1")
+            header("Sec-Fetch-Site", "cross-site")
+            header("Sec-Fetch-Mode", "cors")
+            header("Sec-Fetch-Dest", "empty")
+            header("Cache-Control", "no-cache")
+            header("Pragma", "no-cache")
+
+            // Add headers for better-auth compatibility
+            header("x-app-name", "Folo Web")
+            header("x-app-platform", "desktop/macos/dmg")
+            header("x-app-version", "0.6.2")
+            header("Origin", "app://folo.is")
+            header("Referer", "https://app.folo.is")
+
+            // Set Cookie header directly if token is available
+            cookieAuthToken?.let { token ->
+                // 💩workaround for Ktor bug with cookies
+                header("Cookie", "__Secure-better-auth.session_token=$token")
+//                cookie("__Secure-better-auth.session_token", token, path = "/")
+            }
         }
     }
 
-    fun setSessionToken(token: String) {
-        sessionToken = token
-    }
-
-    fun setCsrfToken(token: String) {
-        csrfToken = token
-    }
-
-    fun clearTokens() {
-        sessionToken = ""
-        csrfToken = ""
-    }
-
-    suspend fun getCsrfToken(): String {
-        val response = client.get(Auth.CSRF()).body<CSRFTokenResponse>()
-        csrfToken = response.csrfToken
-        return response.csrfToken
-    }
-
-    internal suspend inline fun <reified T, reified R : Any> request(
+    /**
+     * Main request method for better-auth that uses automatic cookie management
+     */
+    suspend inline fun <reified T, reified R : Any> request(
         resource: R,
         method: HttpMethod = HttpMethod.Get,
         body: String = "",
         contentType: ContentType = ContentType.Application.Json
     ): T {
-        val token = sessionToken
-        val csrf = getCsrfToken()
-
-        return when (method) {
+        // Debug: Log current cookies before making request
+        val currentCookies = client.cookies(BASE_URL)
+        FLog.d("NetworkManager", "Current cookies for $BASE_URL: ${currentCookies.joinToString(", ") { "${it.name}=${it.value}" }}")
+        FLog.d("NetworkManager", "Manual session token: ${cookieAuthToken ?: "none"}")
+        val result = when (method) {
             HttpMethod.Get -> client.get(resource) {
-                configureRequest(token, csrf, body, contentType)
+                header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7")
+                if (body.isNotEmpty()) {
+                    header(HttpHeaders.ContentType, contentType)
+                    setBody(body)
+                }
+//                manualSessionToken?.let { token ->
+//                    FLog.d("NetworkManager", "Using manual session token: $token")
+//                    cookie("__Secure-better-auth.session_token", token, path = "/")
+//                }
             }
             HttpMethod.Post -> client.post(resource) {
-                configureRequest(token, csrf, body, contentType)
+                header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7")
+                if (body.isNotEmpty()) {
+                    header(HttpHeaders.ContentType, contentType)
+                    setBody(body)
+                }
+//                manualSessionToken?.let { token ->
+//                    cookie("__Secure-better-auth.session_token", token, path = "/")
+//                }
+                // Authentication is handled by defaultRequest Cookie header
+                FLog.d("NetworkManager", "POST: Authentication handled by default Cookie header")
             }
             HttpMethod.Put -> client.put(resource) {
-                configureRequest(token, csrf, body, contentType)
+                header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7")
+                if (body.isNotEmpty()) {
+                    header(HttpHeaders.ContentType, contentType)
+                    setBody(body)
+                }
+                // Authentication is handled by defaultRequest Cookie header
+                FLog.d("NetworkManager", "PUT: Authentication handled by default Cookie header")
             }
             HttpMethod.Delete -> client.delete(resource) {
-                configureRequest(token, csrf, body, contentType)
+                header(HttpHeaders.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7")
+                if (body.isNotEmpty()) {
+                    header(HttpHeaders.ContentType, contentType)
+                    setBody(body)
+                }
+                // Authentication is handled by defaultRequest Cookie header
+                FLog.d("NetworkManager", "DELETE: Authentication handled by default Cookie header")
             }
             else -> throw UnsupportedOperationException("HTTP method $method is not supported")
-        }.body()
-    }
-
-    private fun HttpRequestBuilder.configureRequest(
-        token: String,
-        csrf: String,
-        body: String = "",
-        contentType: ContentType = ContentType.Application.Json
-    ) {
-        header("X-CSRF-Token", csrf)
-        header(HttpHeaders.Accept, contentType)
-        contentType(contentType)
-        header("x-app-version", "0.2.1-beta.0")
-        cookie("authjs.session-token", token)
-        cookie("authjs.csrf-token", csrf)
-        setBody(body)
+        }
+        
+        // Debug: Log cookies after request
+        val newCookies = client.cookies(BASE_URL)
+        FLog.d("NetworkManager", "Cookies after request: ${newCookies.joinToString(", ") { "${it.name}=${it.value}" }}")
+        
+        return result.body()
     }
 }

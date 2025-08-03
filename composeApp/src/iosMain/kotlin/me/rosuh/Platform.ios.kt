@@ -20,11 +20,11 @@ import platform.objc.sel_registerName
 
 private val defaults = NSUserDefaults.standardUserDefaults
 
-actual fun saveSessionToken(token: String) {
+actual fun saveAuthCookieToken(token: String) {
     defaults.setObject(token, "session_token")
 }
 
-actual fun getSessionToken(): String? {
+actual fun getAuthCookieToken(): String? {
     return defaults.stringForKey("session_token")
 }
 
@@ -53,7 +53,7 @@ actual fun startOAuth(provider: String, callback: OAuthCallback) {
     }
     webAuthSession = ASWebAuthenticationSession(
         uRL = url,
-        callbackURLScheme = "follow"
+        callbackURLScheme = "folo"
     ) { callbackURL: NSURL?, error: NSError? ->
         when {
             error != null -> {

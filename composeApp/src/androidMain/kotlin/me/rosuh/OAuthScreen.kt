@@ -62,7 +62,7 @@ fun OAuthScreen(
                         ): Boolean {
                             val uri = request?.url ?: return false
                             return when {
-                                uri.scheme == "follow" -> {
+                                uri.scheme == "folo" -> {
                                     val token = uri.getQueryParameter("token")
                                     if (token != null) {
                                         callback.onSuccess(token)

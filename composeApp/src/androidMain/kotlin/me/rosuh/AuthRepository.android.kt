@@ -22,11 +22,11 @@ private val prefs by lazy {
     )
 }
 
-actual fun saveSessionToken(token: String) {
+actual fun saveAuthCookieToken(token: String) {
     prefs.edit().putString("session_token", token).apply()
 }
 
-actual fun getSessionToken(): String? {
+actual fun getAuthCookieToken(): String? {
     return prefs.getString("session_token", null)
 }
 

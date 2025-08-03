@@ -1,20 +1,27 @@
 package me.rosuh.data
 
 import io.ktor.resources.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
-@Resource("/auth")
-class Auth {
-    @Resource("session")
-    class Session(val parent: Auth = Auth())
+
+@Resource("/better-auth")
+class BetterAuth {
+    @Resource("one-time-token/apply")
+    class OneTimeTokenApply(val parent: BetterAuth = BetterAuth())
     
-    @Resource("csrf")
-    class CSRF(val parent: Auth = Auth())
+    @Resource("get-session")
+    class GetSession(val parent: BetterAuth = BetterAuth())
 }
 
 @Serializable
-data class CSRFTokenResponse(
-    val csrfToken: String
+data class OneTimeTokenRequest(
+    val token: String
+)
+
+@Serializable
+data class OneTimeTokenResponse(
+    @SerialName("user")
+    val user: SessionResponse.User
 )
 

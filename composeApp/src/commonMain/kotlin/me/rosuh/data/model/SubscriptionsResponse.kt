@@ -31,12 +31,12 @@ data class SubscriptionsResponse(
     @SerialName("code")
     val code: Int,
     @SerialName("data")
-    val data: List<Subscription>
+    val data: List<Subscription>,
+    @SerialName("message")
+    val message: String? = null,
 ) {
     @Serializable
     data class Subscription(
-        val boost: Boost? = null,
-        val category: String? = null,
         val feeds: Feeds? = null,
         @SerialName("isPrivate")
         val isPrivate: Boolean? = null,
@@ -55,27 +55,6 @@ data class SubscriptionsResponse(
         @SerialName("view")
         val view: Int
     ) {
-        @Serializable
-        data class Boost(
-            @SerialName("boosters")
-            val boosters: List<Booster>
-        ) {
-            @Serializable
-            data class Booster(
-                @SerialName("createdAt")
-                val createdAt: String?,
-                @SerialName("emailVerified")
-                val emailVerified: String?,
-                @SerialName("handle")
-                val handle: String?,
-                @SerialName("id")
-                val id: String?,
-                @SerialName("image")
-                val image: String?,
-                @SerialName("name")
-                val name: String?
-            )
-        }
 
         @Serializable
         data class Feeds(
@@ -119,8 +98,6 @@ data class SubscriptionsResponse(
             val owner: Owner,
             @SerialName("ownerUserId")
             val ownerUserId: String,
-            @SerialName("timelineUpdatedAt")
-            val timelineUpdatedAt: String,
             @SerialName("title")
             val title: String,
             @SerialName("type")

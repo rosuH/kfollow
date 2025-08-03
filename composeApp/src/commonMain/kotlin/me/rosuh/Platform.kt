@@ -9,8 +9,8 @@ interface Platform {
     val name: String
 }
 
-expect fun saveSessionToken(token: String)
-expect fun getSessionToken(): String?
+expect fun saveAuthCookieToken(token: String)
+expect fun getAuthCookieToken(): String?
 expect fun saveSessionData(data: SessionResponse)
 expect fun getSessionData(): SessionResponse?
 expect fun clearData()

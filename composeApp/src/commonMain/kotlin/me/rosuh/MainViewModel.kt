@@ -26,13 +26,11 @@ import me.rosuh.data.OAuthError
 import me.rosuh.data.SubscriptionRepository
 import me.rosuh.data.api.EntriesApi
 import me.rosuh.data.api.SubscriptionType
-import me.rosuh.data.api.SubscriptionsApi
 import me.rosuh.data.model.EntryData
 import me.rosuh.data.model.PostEntriesResponse
 import me.rosuh.data.model.SubscriptionsResponse
 import me.rosuh.data.model.cover
 import me.rosuh.utils.Either
-import me.rosuh.utils.fold
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -213,10 +211,10 @@ class MainViewModel : ViewModel() {
     }
 
     private fun getAndSetSessionToken(): String? {
-        return getSessionToken()?.takeIf {
+        return getAuthCookieToken()?.takeIf {
             getSessionData()?.isExpired() == false && it.isNotBlank()
-        }?.also {
-            NetworkManager.setSessionToken(it)
+        }?.also { token ->
+            NetworkManager.cookieAuthToken = token
         }
     }
 
@@ -359,7 +357,7 @@ class MainViewModel : ViewModel() {
         FLog.i(TAG, "initialize")
         if (getAndSetSessionToken() != null) {
             updateMainState {
-                loginState = LoginState.Success(false, getSessionToken()!!)
+                loginState = LoginState.Success(false, getAuthCookieToken()!!)
             }
         } else {
             updateMainState {
@@ -372,7 +370,7 @@ class MainViewModel : ViewModel() {
         if (getAndSetSessionToken() != null) {
             // 通知 UI 登录成功
             updateMainState {
-                loginState = LoginState.Success(false, getSessionToken()!!)
+                loginState = LoginState.Success(false, getAuthCookieToken()!!)
             }
             return@withContext
         }
@@ -422,14 +420,14 @@ class MainViewModel : ViewModel() {
             }
             return@withContext
         }
-        FLog.i(TAG, "login OAuth success, token: ${token.take(3)}")
-        // 保存 token
-        saveSessionToken(token)
+        FLog.i(TAG, "login OAuth success, token: $token")
 
         // 获取 session
         try {
-            val session = authService.getSession(token)
-            saveSessionData(session)
+            val cookieToken = authService.getAuthCookieToken(token)
+            saveAuthCookieToken(cookieToken)
+            val sessionData = authService.getSession()
+            saveSessionData(sessionData)
             // 通知 UI 登录成功
             updateMainState {
                 loginState = LoginState.Success(true, token)

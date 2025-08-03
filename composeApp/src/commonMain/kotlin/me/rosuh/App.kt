@@ -1115,7 +1115,9 @@ fun ArticleScreen(
         when {
             articleState is LoadState.Error && articleState.data?.subscriptionEntriesMap.isNullOrEmpty() -> {
                 ErrorScreen(articleState) {
-                    onLoadHome(true, false)
+                    openWebPage("https://www.qq.com") { webPageState ->
+
+                    }
                 }
             }
 

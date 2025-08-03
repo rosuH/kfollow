@@ -1,58 +1,77 @@
 package me.rosuh.data
 
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.ExperimentalTime
 
 @Serializable
 data class SessionResponse(
-    @SerialName("expires")
-    val expires: String,
-    @SerialName("invitation")
-    val invitation: Invitation,
-    @SerialName("role")
-    val role: String,
     @SerialName("user")
     val user: User,
-    @SerialName("userId")
-    val userId: String
+    @SerialName("session")
+    val session: Session,
+    @SerialName("role")
+    val role: String?
 ) {
+    @OptIn(ExperimentalTime::class)
     fun isExpired(): Boolean {
-        return Clock.System.now().toEpochMilliseconds() > Instant.parse(expires).toEpochMilliseconds()
+        return kotlin.time.Clock.System.now() > kotlin.time.Instant.parse(session.expiresAt)
     }
 
     @Serializable
-    data class Invitation(
-        @SerialName("code")
-        val code: String,
-        @SerialName("createdAt")
-        val createdAt: String,
-        @SerialName("fromUserId")
-        val fromUserId: String,
-        @SerialName("toUserId")
-        val toUserId: String
-    )
-
-    @Serializable
     data class User(
-        @SerialName("createdAt")
-        val createdAt: String,
+        @SerialName("name")
+        val name: String,
         @SerialName("email")
         val email: String,
         @SerialName("emailVerified")
-        val emailVerified: String?,
-        @SerialName("handle")
-        val handle: String,
-        @SerialName("id")
-        val id: String,
+        val emailVerified: Boolean,
         @SerialName("image")
         val image: String,
-        @SerialName("name")
-        val name: String
+        @SerialName("createdAt")
+        val createdAt: String,
+        @SerialName("updatedAt")
+        val updatedAt: String,
+        @SerialName("stripeCustomerId")
+        val stripeCustomerId: String?,
+        @SerialName("twoFactorEnabled")
+        val twoFactorEnabled: Boolean?,
+        @SerialName("handle")
+        val handle: String,
+        @SerialName("socialLinks")
+        val socialLinks: Map<String, String> = emptyMap(),
+        @SerialName("bio")
+        val bio: String?,
+        @SerialName("website")
+        val website: String?,
+        @SerialName("deleted")
+        val deleted: String?,
+        @SerialName("role")
+        val role: String?,
+        @SerialName("roleEndAt")
+        val roleEndAt: String?,
+        @SerialName("id")
+        val id: String
+    )
+
+    @Serializable
+    data class Session(
+        @SerialName("expiresAt")
+        val expiresAt: String,
+        @SerialName("token")
+        val token: String,
+        @SerialName("createdAt")
+        val createdAt: String,
+        @SerialName("updatedAt")
+        val updatedAt: String,
+        @SerialName("ipAddress")
+        val ipAddress: String,
+        @SerialName("userAgent")
+        val userAgent: String,
+        @SerialName("userId")
+        val userId: String,
+        @SerialName("id")
+        val id: String
     )
 }
