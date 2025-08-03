@@ -240,7 +240,10 @@ class MainViewModel : ViewModel() {
 
             is Action.GoDetail -> {
                 viewModelScope.launch {
-                    openWebPage(action.entryData.entries.url ?: action.entryData.entries.guid) { webPageState ->
+                    val url = withContext(Dispatchers.Default) {
+                        Url(action.entryData.entries.url ?: "https://www.example.com").toString()
+                    }
+                    openWebPage(url) { webPageState ->
                         FLog.i(TAG, "web page state: $webPageState")
                     }
                 }
